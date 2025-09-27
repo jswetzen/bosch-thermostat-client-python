@@ -1,6 +1,7 @@
 BS = 16
 XMPP = "XMPP"
 HTTP = "HTTP"
+POINTTAPI = "POINTTAPI"
 UUID = "uuid"
 
 """ METHODS """

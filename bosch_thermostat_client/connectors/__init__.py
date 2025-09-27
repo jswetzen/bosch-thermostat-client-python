@@ -3,11 +3,16 @@ from .ivt import IVTXMPPConnector
 from .nefit import NefitConnector
 from .easycontrol import EasycontrolConnector
 
-from bosch_thermostat_client.const import HTTP
+from bosch_thermostat_client.const import HTTP, POINTTAPI
 
 
 def connector_ivt_chooser(session_type):
-    return HttpConnector if session_type.upper() == HTTP else IVTXMPPConnector
+    if session_type.upper() == POINTTAPI:
+        return HttpConnector
+    elif session_type.upper() == HTTP:
+        return HttpConnector
+    else:
+        return IVTXMPPConnector
 
 
 __all__ = [
