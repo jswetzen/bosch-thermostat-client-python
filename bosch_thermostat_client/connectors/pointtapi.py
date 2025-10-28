@@ -35,9 +35,17 @@ class BulkEndpoint:
     is requested since the last bulk request.
     """
 
-    def __init__(self, loop, headers, endpoint, uris):
-        self._loop = loop
-        self._headers = headers
+    def __init__(self, websession, headers_callback, endpoint, uris):
+        """Initialize BulkEndpoint.
+
+        Args:
+            websession: The aiohttp session for making requests
+            headers_callback: Callable that returns current headers (for token refresh)
+            endpoint: The bulk endpoint URL
+            uris: List of URIs this bulk endpoint covers
+        """
+        self._websession = websession
+        self._headers_callback = headers_callback
         self._endpoint = endpoint
         self._uris = uris
         self._data = {}
@@ -54,7 +62,9 @@ class BulkEndpoint:
             return {}
 
     async def _request(self):
-        async with self._loop.get(self._endpoint, headers=self._headers) as response:
+        # Get fresh headers on each request to handle token refresh
+        headers = self._headers_callback()
+        async with self._websession.get(self._endpoint, headers=headers) as response:
             data = await response.json()
         for uri_data in data.get("references", []):
             self._data[uri_data["id"]] = uri_data
@@ -225,7 +235,7 @@ class PoinTTAPIConnector:
     def add_bulk_endpoint(self, endpoint, uris):
         """Add a bulk endpoint for efficient batch requests."""
         bulk_endpoint = BulkEndpoint(
-            self._websession, self._headers, self._make_url(endpoint), uris
+            self._websession, lambda: self._headers, self._make_url(endpoint), uris
         )
         self._bulk_endpoints[endpoint] = bulk_endpoint
         self._uri_bulk_endpoints.update({uri: bulk_endpoint for uri in uris})
@@ -266,6 +276,19 @@ class PoinTTAPIConnector:
 
     async def get(self, uri):
         """Get data from API endpoint."""
+        # Special handling for /acCircuits endpoint which doesn't exist in PoinTT API
+        # Return a static response with a single AC circuit reference
+        if uri == "/acCircuits":
+            return {
+                "id": "/acCircuits",
+                "references": [
+                    {
+                        "id": "ac1",
+                        "type": "airConditioning"
+                    }
+                ]
+            }
+
         # Check if this URI has a bulk endpoint
         if uri in self._uri_bulk_endpoints:
             return await self._uri_bulk_endpoints[uri].get(uri)

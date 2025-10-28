@@ -14,6 +14,7 @@ from bosch_thermostat_client.const import (
     VALUES,
 )
 from bosch_thermostat_client.const.ivt import SYSTEM_INFO
+from bosch_thermostat_client.const.pointtapi import CIRCUIT_TYPES
 from bosch_thermostat_client.exceptions import DeviceException
 
 from .base import BaseGateway
@@ -25,7 +26,7 @@ class PoinTTAPIGateway(BaseGateway):
     """Gateway connecting to the Bosch PoinTT API."""
 
     device_type = POINTTAPI
-    circuit_types = {}
+    circuit_types = CIRCUIT_TYPES
 
     def __init__(
         self,
@@ -53,7 +54,7 @@ class PoinTTAPIGateway(BaseGateway):
             loop=session,
             token_file=token_file,
         )
-        self._data = {GATEWAY: {}, HC: None, SENSORS: None}
+        self._data = {GATEWAY: {}, AC: None, SENSORS: None}
         super().__init__(device_id)
 
     async def _update_info(self, initial_db):
