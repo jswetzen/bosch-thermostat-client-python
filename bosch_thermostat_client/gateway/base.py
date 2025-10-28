@@ -1,4 +1,5 @@
 """Gateway module connecting to Bosch thermostat."""
+
 from __future__ import annotations
 
 import json
@@ -82,10 +83,14 @@ class BaseGateway:
         initial_db = await self.get_base_db()
         await self._update_info(initial_db.get(GATEWAY))
         self._firmware_version = self._data[GATEWAY].get(FIRMWARE_VERSION)
+        print(initial_db)
+        print(self._data)
         self._device = self.get_device_model(initial_db)
         if self._device and VALUE in self._device:
             _LOGGER.debug("Found device %s", json.dumps(self._device))
-            self._db = await get_db_of_firmware(self._device[TYPE], self._firmware_version)
+            self._db = await get_db_of_firmware(
+                self._device[TYPE], self._firmware_version
+            )
             if self._db:
                 _LOGGER.debug(
                     f"Loading database: {self._device[TYPE]} for firmware {self._firmware_version}"
@@ -284,7 +289,9 @@ class BaseGateway:
         """Initialize sensors objects."""
         if SENSORS in self._db:
             self._data[SENSORS] = Sensors(
-                connector=self._connector, sensors_db=self._db[SENSORS], errors=self._errors
+                connector=self._connector,
+                sensors_db=self._db[SENSORS],
+                errors=self._errors,
             )
         if CRAWL_SENSORS in self._db:
             _LOGGER.info("Initializing Crawl Sensors.")
