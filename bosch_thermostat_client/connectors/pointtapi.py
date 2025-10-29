@@ -295,6 +295,9 @@ class PoinTTAPIConnector:
                 ]
             }
 
+        # IMPORTANT: Ensure token is valid before ANY API call (including bulk endpoints)
+        await self._ensure_valid_token()
+
         # Check if this URI has a bulk endpoint
         if uri in self._uri_bulk_endpoints:
             return await self._uri_bulk_endpoints[uri].get(uri)
