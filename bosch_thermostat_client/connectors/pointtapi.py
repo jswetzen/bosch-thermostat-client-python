@@ -160,7 +160,7 @@ class PoinTTAPIConnector:
                 'access_token': self._access_token,
                 'refresh_token': self._refresh_token,
                 'expires_at': self._token_expires_at.isoformat() if self._token_expires_at else None,
-                'saved_at': datetime.now().isoformat(),
+                'saved_at': datetime.now(timezone.utc).isoformat(),
                 'device_id': self._device_id,
             }
 
@@ -181,11 +181,17 @@ class PoinTTAPIConnector:
             _LOGGER.error("Could not save tokens to %s: %s", self._token_file, e)
 
     def _is_token_expired(self):
-        """Check if the current token is expired or expires soon."""
+        """Check if the current token is expired or expires soon.
+
+        Returns True if:
+        - Token expires within 5 minutes, OR
+        - No expiry timestamp is set (initial state with refresh token available)
+        """
         if not self._token_expires_at:
-            return False
+            # If we have a refresh token but no expiry, refresh proactively
+            return bool(self._refresh_token)
         # Consider token expired if it expires within 5 minutes
-        return datetime.now() >= (self._token_expires_at - timedelta(minutes=5))
+        return datetime.now(timezone.utc) >= (self._token_expires_at - timedelta(minutes=5))
 
     async def _refresh_access_token(self):
         """Refresh the access token using the refresh token."""
@@ -206,10 +212,10 @@ class PoinTTAPIConnector:
                         self._refresh_token = token_data['refresh_token']
 
                     expires_in = token_data.get('expires_in', 3600)
-                    self._token_expires_at = datetime.now() + timedelta(seconds=expires_in)
+                    self._token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
                     self._save_tokens()
-                    _LOGGER.debug("Successfully refreshed access token")
+                    _LOGGER.info("Successfully refreshed access token (expires in %s seconds)", expires_in)
                     return True
                 else:
                     raise DeviceException(f"Token refresh failed: {response.status}")

@@ -246,6 +246,30 @@
             "device_class": "airflow"
         }
     },
+    "acCircuits": {
+        "refs": {
+            "current_temp": {
+                "id": "/airConditioning/roomTemperature",
+                "name": "Room temperature",
+                "type": "regular"
+            },
+            "operation_mode": {
+                "id": "/airConditioning/operationMode",
+                "name": "Operation mode",
+                "type": "operation_mode"
+            },
+            "target_temp": {
+                "id": "/airConditioning/temperatureSetpoint",
+                "name": "Target temperature",
+                "type": "setpoint"
+            },
+            "status": {
+                "id": "/airConditioning/acControl",
+                "name": "AC control status",
+                "type": "regular"
+            }
+        }
+    },
     "refs": {
       "operation_mode": {
         "id": "/airConditioning/operationMode",

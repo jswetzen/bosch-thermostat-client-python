@@ -125,5 +125,7 @@ class PoinTTAPIGateway(BaseGateway):
 
     def get_device_model(self, _db):
         """Find device model."""
-        # Device model is not provided by PoinTTAPI
+        # Device model is not provided by PoinTTAPI, use static value
+        # Set bus_type to POINTTAPI for proper circuit initialization
+        self._bus_type = POINTTAPI
         return _db.get(MODELS).get(POINTTAPI)
