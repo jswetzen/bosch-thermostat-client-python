@@ -285,8 +285,8 @@ class PoinTTAPIConnector:
 
     async def get(self, uri):
         """Get data from API endpoint."""
-        # Special handling for /acCircuits endpoint which doesn't exist in PoinTT API
-        # Return a static response with a single AC circuit reference
+        # Special handling for PoinTT API endpoints that don't exist
+        # Return static responses for circuit discovery
         if uri == "/acCircuits":
             return {
                 "id": "/acCircuits",
@@ -296,6 +296,16 @@ class PoinTTAPIConnector:
                         "type": "airConditioning"
                     }
                 ]
+            }
+
+        # Handle individual circuit reference
+        # This is needed for the crawl function during circuit discovery
+        # Must include "references" key for Circuits.initialize() to process it
+        if uri == "/ac1":
+            return {
+                "id": "ac1",
+                "type": "airConditioning",
+                "references": []  # Empty list = leaf node, but key must exist
             }
 
         # IMPORTANT: Ensure token is valid before ANY API call (including bulk endpoints)
