@@ -236,7 +236,11 @@ class TestTokenRefresh(unittest.TestCase):
 
             mock_session = MagicMock()
             mock_session.post = MagicMock(return_value=mock_token_cm)
-            mock_session.get = MagicMock(return_value=mock_api_cm)
+
+            # Mock get method with __name__ attribute for logging
+            mock_get = MagicMock(return_value=mock_api_cm)
+            mock_get.__name__ = 'get'
+            mock_session.get = mock_get
 
             connector = PoinTTAPIConnector(
                 host=self.device_id,
