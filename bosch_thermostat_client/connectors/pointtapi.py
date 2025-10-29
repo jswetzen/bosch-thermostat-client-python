@@ -201,6 +201,9 @@ class PoinTTAPIConnector:
         data = {
             'grant_type': 'refresh_token',
             'refresh_token': self._refresh_token,
+            'scope': ' '.join(self.SCOPES),
+            'client_id': self.CLIENT_ID,
+            'code_verifier': self.CODE_VERIFIER,
         }
 
         try:
