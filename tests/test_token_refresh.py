@@ -108,7 +108,7 @@ class TestTokenRefresh(unittest.TestCase):
     def test_refresh_access_token(self):
         """Test that refresh_access_token actually calls the API and updates tokens."""
         async def run_test():
-            # Mock the aiohttp session
+            # Mock the aiohttp session with proper async context manager
             mock_response = AsyncMock()
             mock_response.status = 200
             mock_response.json = AsyncMock(return_value={
@@ -117,8 +117,13 @@ class TestTokenRefresh(unittest.TestCase):
                 'expires_in': 3600
             })
 
+            # Create context manager mock
+            mock_cm = AsyncMock()
+            mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_cm.__aexit__ = AsyncMock(return_value=None)
+
             mock_session = MagicMock()
-            mock_session.post = MagicMock(return_value=mock_response)
+            mock_session.post = MagicMock(return_value=mock_cm)
 
             connector = PoinTTAPIConnector(
                 host=self.device_id,
@@ -156,7 +161,7 @@ class TestTokenRefresh(unittest.TestCase):
     def test_ensure_valid_token_with_expired_token(self):
         """Test that ensure_valid_token triggers refresh when token is expired."""
         async def run_test():
-            # Mock the aiohttp session
+            # Mock the aiohttp session with proper async context manager
             mock_response = AsyncMock()
             mock_response.status = 200
             mock_response.json = AsyncMock(return_value={
@@ -165,8 +170,13 @@ class TestTokenRefresh(unittest.TestCase):
                 'expires_in': 3600
             })
 
+            # Create context manager mock
+            mock_cm = AsyncMock()
+            mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_cm.__aexit__ = AsyncMock(return_value=None)
+
             mock_session = MagicMock()
-            mock_session.post = MagicMock(return_value=mock_response)
+            mock_session.post = MagicMock(return_value=mock_cm)
 
             connector = PoinTTAPIConnector(
                 host=self.device_id,
@@ -196,7 +206,7 @@ class TestTokenRefresh(unittest.TestCase):
     def test_get_triggers_token_refresh(self):
         """Test that calling get() triggers token refresh when token is expired."""
         async def run_test():
-            # Mock the aiohttp session
+            # Mock token refresh response
             mock_token_response = AsyncMock()
             mock_token_response.status = 200
             mock_token_response.json = AsyncMock(return_value={
@@ -205,6 +215,12 @@ class TestTokenRefresh(unittest.TestCase):
                 'expires_in': 3600
             })
 
+            # Create token refresh context manager mock
+            mock_token_cm = AsyncMock()
+            mock_token_cm.__aenter__ = AsyncMock(return_value=mock_token_response)
+            mock_token_cm.__aexit__ = AsyncMock(return_value=None)
+
+            # Mock API call response
             mock_api_response = AsyncMock()
             mock_api_response.status = 200
             mock_api_response.json = AsyncMock(return_value={
@@ -213,9 +229,14 @@ class TestTokenRefresh(unittest.TestCase):
             })
             mock_api_response.content_type = 'application/json'
 
+            # Create API call context manager mock
+            mock_api_cm = AsyncMock()
+            mock_api_cm.__aenter__ = AsyncMock(return_value=mock_api_response)
+            mock_api_cm.__aexit__ = AsyncMock(return_value=None)
+
             mock_session = MagicMock()
-            mock_session.post = MagicMock(return_value=mock_token_response)
-            mock_session.get = MagicMock(return_value=mock_api_response)
+            mock_session.post = MagicMock(return_value=mock_token_cm)
+            mock_session.get = MagicMock(return_value=mock_api_cm)
 
             connector = PoinTTAPIConnector(
                 host=self.device_id,
