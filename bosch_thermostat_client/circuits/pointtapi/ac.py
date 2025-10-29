@@ -58,6 +58,18 @@ class ACCircuit(BasicCircuit):
         self._airflow_horizontal_uri = "/airConditioning/airFlowHorizontal"
         self._airflow_vertical_uri = "/airConditioning/airFlowVertical"
 
+    async def initialize(self):
+        """Initialize AC circuit.
+
+        PoinTT API doesn't have individual circuit endpoints - all data comes from
+        the bulk endpoint. We just mark the circuit as active and initialize switches.
+        """
+        # Mark circuit as active (no STATUS endpoint to fetch)
+        self._state = True
+        # Initialize switches if database has them
+        from bosch_thermostat_client.const import SWITCHES
+        await self._switches.initialize(switches=self._db.get(SWITCHES))
+
     @property
     def current_temp(self):
         """Get current room temperature."""
