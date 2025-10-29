@@ -21,6 +21,13 @@ Create a `tokens.json` file with your credentials:
 }
 ```
 
+**Important:** Set secure file permissions:
+```bash
+chmod 600 tokens.json
+```
+
+This prevents the warning: "Token file tokens.json has insecure permissions"
+
 The library will automatically:
 - Load these tokens on initialization
 - Refresh the access token when it expires (every ~1 hour)
@@ -118,6 +125,22 @@ The library handles token refresh automatically:
 - Saves new tokens to the token file
 - Uses the refresh token to get new access tokens
 
+### Token File Format
+
+After the first refresh, your `tokens.json` will be automatically updated with:
+```json
+{
+  "access_token": "new_access_token",
+  "refresh_token": "refresh_token",
+  "expires_at": "2025-10-29T15:30:00.123456",
+  "saved_at": "2025-10-29T14:30:00.123456",
+  "device_id": "101638933"
+}
+```
+
+The `expires_at` timestamp is used to determine when to refresh the token automatically,
+so you don't need to manually track token expiry.
+
 ## Bulk Endpoints
 
 The PoinTT API uses "bulk endpoints" for efficiency. The library automatically:
@@ -185,6 +208,12 @@ available circuits, the PoinTT API doesn't have a `/acCircuits` endpoint. Instea
 3. The circuit initialization uses the `ac1` identifier
 
 This is a workaround specific to PoinTT API's architecture.
+
+### Firmware Version
+
+PoinTT API doesn't expose a firmware version endpoint. The gateway hardcodes the firmware
+version to "05.00.06" during initialization. This allows it to load the correct database
+(`db/pointtapi/050006.json`) without needing to query the API.
 
 ## Next Steps
 
