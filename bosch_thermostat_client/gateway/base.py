@@ -83,8 +83,6 @@ class BaseGateway:
         initial_db = await self.get_base_db()
         await self._update_info(initial_db.get(GATEWAY))
         self._firmware_version = self._data[GATEWAY].get(FIRMWARE_VERSION)
-        print(initial_db)
-        print(self._data)
         self._device = self.get_device_model(initial_db)
         if self._device and VALUE in self._device:
             _LOGGER.debug("Found device %s", json.dumps(self._device))
