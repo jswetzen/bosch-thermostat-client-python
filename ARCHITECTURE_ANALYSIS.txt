@@ -1,0 +1,791 @@
+BOSCH THERMOSTAT CLIENT ARCHITECTURE - BRAIN DUMP
+==================================================
+
+LAYER STRUCTURE
+---------------
+App Layer → Gateway (device logic) → Connector (protocol) → Physical Device
+
+CONNECTORS (Protocol Layer)
+---------------------------
+Purpose: Low-level communication, encryption, authentication
+Methods: get(path), put(path, value), connect(), close()
+Types: IVTXMPPConnector, NefitConnector, EasycontrolConnector, HttpConnector, PoinTTAPIConnector
+
+XMPP-BASED CONNECTORS (IVT/Nefit/Easycontrol):
+- Protocol: XMPP (Jabber) over wa2-mz36-qrmzh6.bosch.de or xmpp.rrcng.ticx.boschtt.net
+- Auth: JID = prefix + serialnumber@host, password = prefix + access_key
+- Message format: HTTP-like wrapped in XMPP body (GET/PUT with headers)
+- Encryption: AES-128-ECB with PKCS7 padding, device-specific magic bytes
+- Flow: build_message() → encrypt() → send_message() → wait for response → decrypt() → parse JSON
+- Sequence numbers: IVT and Easycontrol track Seq-No, Nefit doesn't
+- Threading: Uses asyncio locks to queue requests (prevent race conditions)
+- Timeout: 6s for GET, 10s for PUT
+- Response format: "HTTP/1.1 200 OK\n...\n{encrypted_json_body}"
+
+IVT specifics:
+- User-Agent: TeleHeater
+- Access key prefix: C6u9jPue_
+- Contact prefix: contact_
+- Gateway prefix: gateway_
+- Line endings: \r\r
+
+Nefit specifics:
+- User-Agent: NefitEasy
+- Access key prefix: Ct7ZR03b_
+- Contact prefix: rrccontact_
+- Gateway prefix: rrcgateway_
+- Line endings: \r\r
+- No Seq-No
+
+Easycontrol specifics:
+- User-Agent: rrc2
+- Access key prefix: C42i9NNp_
+- Contact prefix: rrccontact_
+- Gateway prefix: rrcgateway_
+- Line endings: \n for GET, \r for PUT
+- XMPP host: xmpp.rrcng.ticx.boschtt.net (DIFFERENT)
+- CA cert: easycontrol_ca.pem
+- Has Seq-No
+
+HTTP CONNECTOR (Fallback):
+- Simple HTTPS REST API
+- Used when XMPP not available
+- Same endpoint structure
+- No XMPP overhead
+
+POINTTAPI CONNECTOR (Cloud-based):
+- Protocol: HTTPS OAuth 2.0 PKCE
+- Base URL: https://pointt-api.bosch-thermotechnology.com/pointt-api/api/v1/gateways/{device_id}/resource/
+- Auth: Authorization: Bearer {access_token} header
+- Token refresh: POST /oauth/token with refresh_token, scope, client_id, code_verifier
+- Token storage: tokens.json with access_token, refresh_token, expires_at (UTC timestamp)
+- Proactive refresh: 5 minutes before expiry
+- No encryption (TLS only)
+- No XMPP/persistent connection
+- Bulk endpoints: Multiple URIs fetched in one API call via /airConditioning/standardFunctions
+- URL construction: _make_url() adds "resource/" prefix if not present
+
+GATEWAYS (Device Logic Layer)
+------------------------------
+Purpose: Device initialization, firmware detection, circuit management, database loading
+Data: _firmware_version, _device, _db, _bus_type, _data dict
+Methods: initialize(), get_device_model(), initialize_circuits(), sensors property, switches property
+
+Initialization flow:
+1. get_base_db() - load db_DEVICETYPE.json
+2. _update_info() - fetch gateway info (uuid, firmware, system_bus, product_id)
+3. Extract firmware version from response
+4. get_device_model() - detect device model based on system_info/product_id
+5. get_db_of_firmware() - load firmware-specific DB (e.g., rc300_rc200/040703.json)
+6. Merge databases
+7. async_get_errors() - load error definitions
+8. initialize_circuits() for each circuit type
+9. initialize_sensors(), initialize_switches()
+10. Set _initialized = True
+
+IVT GATEWAY:
+- Bus types: CAN or EMS (detected from SYSTEM_BUS field)
+- Device detection: system_info array with device IDs, prefers ID 158, else highest
+- Circuit types: HC, DHW, SC
+- Connector: IVTXMPPConnector
+- MB-LAN variant: IVTMBLanGateway for gateway devices
+
+NEFIT GATEWAY:
+- Bus type: EMS (checks SYSTEM_BUS references)
+- Device detection: PRODUCT_ID lookup in model scheme
+- Circuit types: HC, DHW, SC
+- Connector: NefitConnector
+
+EASYCONTROL GATEWAY:
+- Bus type: EMS (checks SYSTEM_BUS references)
+- Device detection: PRODUCT_ID lookup in model scheme
+- Circuit types: DHW, ZN (zones), DV (devices), HC, SC
+- Connector: EasycontrolConnector
+- SPECIAL: heating_circuits property returns ZN circuits instead of HC
+- Data structure includes ZN and DV
+
+POINTTAPI GATEWAY:
+- Bus type: POINTTAPI (constant)
+- Device detection: Static model from database
+- Circuit types: HC, AC (air conditioning)
+- Connector: PoinTTAPIConnector
+- Firmware version: HARDCODED to "05.00.06" (API doesn't expose /gateway/versionFirmware)
+- Data structure: {GATEWAY: {}, AC: None, SENSORS: None} (no DHW/SC)
+- Bulk endpoints: Configured during initialization for efficient batch fetching
+
+CIRCUITS (Circuit Discovery & Management)
+------------------------------------------
+Purpose: Discover and manage individual circuit instances (heating zones, DHW, AC units, etc.)
+
+Class hierarchy:
+- BasicCircuit (base)
+  - IVTCircuit
+  - NefitCircuit
+    - NefitHeatingCircuit
+  - EasycontrolCircuit
+    - EasyDhwCircuit
+    - EasyZoneCircuit
+  - ACCircuit (PoinTT API)
+
+CIRCUIT DISCOVERY FLOW:
+1. Gateway calls initialize_circuits(circuit_type)
+2. Creates Circuits object with connector, circuit_type, bus_type, device_type
+3. Circuits.initialize() calls retrieve_from_module(1, f"/{db_prefix}")
+4. retrieve_from_module() calls crawl() function
+5. crawl() recursively discovers circuits:
+   - GET /{db_prefix} (e.g., /heatingCircuits)
+   - Response: {"id": "/heatingCircuits", "references": [{"id": "hc1"}, {"id": "hc2"}]}
+   - For each reference, GET /{ref_id} with depth-1
+   - Responses with no REFERENCES key or depth=0 are added to results list
+6. For each discovered circuit with REFERENCES key:
+   - create_circuit() instantiates appropriate Circuit class
+   - circuit.initialize() fetches STATUS endpoint and initializes switches
+   - If circuit.state is True, append to _items list
+7. Return list of active circuits
+
+CRITICAL: crawl() only processes responses that contain a REFERENCES key
+- Leaf nodes need "references": [] (empty array)
+- Without REFERENCES key, circuit is ignored by discovery
+
+CIRCUIT TYPE SELECTION:
+choose_circuit_type(device_type, circuit_type) returns appropriate class:
+- IVT + HC/DHW/SC → IVTCircuit
+- NEFIT + HC → NefitHeatingCircuit
+- NEFIT + DHW/SC → NefitCircuit
+- EASYCONTROL + DHW → EasyDhwCircuit
+- EASYCONTROL + ZN → EasyZoneCircuit
+- EASYCONTROL + HC/SC → EasycontrolCircuit
+- POINTTAPI + AC → ACCircuit
+- POINTTAPI + HC → IVTCircuit
+
+CIRCUIT DATA STRUCTURE:
+Each circuit has:
+- _main_uri: e.g., "/heatingCircuits/hc1"
+- _data dict with keys from database refs:
+  - key: logical name (e.g., "current_temp")
+  - value: {RESULT: {}, URI: "/heatingCircuits/hc1/roomtemperature", TYPE: "regular"}
+- _db: database section for this circuit type
+- _switches: Switches object for writable endpoints
+- state: Boolean indicating if circuit is active
+
+EXPECTED ENDPOINTS (Standard Circuits):
+For HC (heating circuit):
+- /{circuit_type}/{id}/roomtemperature - current temp
+- /{circuit_type}/{id}/operationMode - mode (auto/manual/off)
+- /{circuit_type}/{id}/manualRoomSetpoint - manual setpoint
+- /{circuit_type}/{id}/temporaryRoomSetpoint - temp setpoint
+- /{circuit_type}/{id}/status - circuit status
+- /{circuit_type}/{id}/switchPrograms - schedules
+
+For DHW (domestic hot water):
+- /dhwCircuits/{id}/actualTemp - current temp
+- /dhwCircuits/{id}/desiredTemp - target temp
+- /dhwCircuits/{id}/operationMode - mode
+- /dhwCircuits/{id}/status - status
+
+For SC (solar):
+- /solarCircuits/{id}/collectorTemperature
+- /solarCircuits/{id}/status
+
+For AC (air conditioning - PoinTT API):
+- /airConditioning/roomTemperature
+- /airConditioning/operationMode
+- /airConditioning/temperatureSetpoint
+- /airConditioning/acControl
+- /airConditioning/fanSpeed
+- /airConditioning/powerState
+
+CIRCUIT INITIALIZATION:
+BasicCircuit.initialize():
+1. Fetch STATUS endpoint: await self.update_requested_key(STATUS)
+2. Initialize switches: await self._switches.initialize(switches=self._db.get(SWITCHES))
+3. If successful, self._state = True
+
+ACCircuit.initialize() OVERRIDE:
+1. Set self._state = True directly (no STATUS fetch)
+2. Initialize switches only
+3. Reason: PoinTT API doesn't have individual circuit status endpoints
+
+DATABASE STRUCTURE
+------------------
+Two-level database system:
+1. Base DB: db_DEVICETYPE.json (e.g., db_IVT.json, db_POINTTAPI.json)
+2. Firmware DB: device_subfolder/version.json (e.g., rc300_rc200/040703.json, pointtapi/050006.json)
+
+Base DB contains:
+- versionFirmwarePath: Where to fetch firmware version
+- gateway: Gateway endpoint mappings
+- models: Device model definitions
+- circuit containers: e.g., "heatingCircuits", "acCircuits"
+- _unsupported: Endpoints not available for this device type
+
+Firmware DB contains:
+- refs: Logical name → endpoint ID mappings
+- sensors: Additional sensor endpoints
+- switches: Writable control endpoints
+- mode_to_setpoint: Maps operation modes to setpoint refs
+- hastates: Maps device modes to Home Assistant climate modes
+- bulk_endpoints: (PoinTT API) Maps bulk endpoint URL to array of URIs
+
+REFS vs REFERENCES vs CIRCUIT_TYPES:
+- refs: Database JSON - static mapping of logical names to endpoint IDs
+  Example: {"current_temp": {"id": "roomtemperature", "type": "regular"}}
+- references: API response - dynamic list of discovered child entities
+  Example: {"references": [{"id": "hc1"}, {"id": "hc2"}]}
+- CIRCUIT_TYPES: Constant dict mapping circuit type constants to DB keys
+  Example: {HC: "heatingCircuits", DHW: "dhwCircuits", AC: "acCircuits"}
+
+URI CONSTRUCTION:
+Standard: /{circuit_type}/{circuit_id}/{ref_id}
+Example: /heatingCircuits/hc1/roomtemperature
+
+PoinTT API: /{category}/{property}
+Example: /airConditioning/roomTemperature
+
+BULK ENDPOINTS (PoinTT API Only):
+Single API call fetches multiple URIs:
+Endpoint: /resource/airConditioning/standardFunctions
+Maps to URIs:
+- /airConditioning/roomTemperature
+- /airConditioning/operationMode
+- /airConditioning/temperatureSetpoint
+- (etc.)
+
+Response contains all values in one JSON object
+BulkEndpoint class caches values and serves individual URI requests from cache
+
+SENSORS & SWITCHES
+------------------
+Sensors: Read-only endpoints
+Switches: Writable control endpoints (PUT requests)
+
+Both initialized from database definitions after circuits
+
+CONST FILES
+-----------
+const/__init__.py - Base constants (REFERENCES, REFS, HC, DHW, STATUS, etc.)
+const/ivt.py - IVT constants (CIRCUIT_TYPES, MODELS, endpoints)
+const/nefit.py - Nefit constants
+const/easycontrol.py - Easycontrol constants (includes ZN, DV)
+const/pointtapi.py - PoinTT API constants (AC circuit type, BULK_ENDPOINTS)
+
+REQUEST FLOW EXAMPLE (XMPP)
+----------------------------
+1. User: gateway.get("/heatingCircuits/hc1/roomtemperature")
+2. Gateway: passes to connector.get(path)
+3. Connector: Check if authenticated, connect() if needed
+4. Connector: Acquire asyncio lock (queue request)
+5. Connector: _build_message(GET, path) → "GET /path HTTP/1.1\r\rUser-Agent: ...\r\r"
+6. Connector: Register listener callback
+7. Connector: client.send_message(mto=gateway_jid, mbody=message)
+8. XMPP: Transmit to device
+9. Device: Process and respond via XMPP
+10. Connector: main_listener() receives XMPP message
+11. Connector: Parse "HTTP/1.1 200 OK" response
+12. Connector: Decrypt body using AES
+13. Connector: Parse JSON and validate "id" field matches request
+14. Connector: listener() calls future.set_result(data)
+15. Connector: Release lock
+16. User: Receives {"value": 21.5, "id": "/heatingCircuits/hc1/roomtemperature"}
+
+REQUEST FLOW EXAMPLE (PoinTT API)
+----------------------------------
+1. User: gateway.get("/airConditioning/roomTemperature")
+2. Gateway: passes to connector.get(uri)
+3. Connector: Check if token expired, refresh if needed
+4. Connector: Check if URI in bulk endpoints
+5. If bulk: Return cached value from BulkEndpoint
+6. If not bulk: Make HTTPS GET with Authorization: Bearer token
+7. Parse JSON response
+8. Return data
+
+TOKEN REFRESH FLOW (PoinTT API):
+1. Check _is_token_expired() (5 min before actual expiry)
+2. If expired or no expires_at: POST /oauth/token
+3. Body: grant_type=refresh_token, refresh_token=X, scope=X, client_id=X, code_verifier=X
+4. Response: {access_token, refresh_token, expires_in}
+5. Update _access_token, _refresh_token, _token_expires_at
+6. Save to tokens.json
+7. Update _headers with new token
+
+ERROR HANDLING
+--------------
+DeviceException: Generic device communication error
+FailedAuthException: Authentication failed
+Timeouts: 6s for GET, 10s for PUT
+HTTP errors: 400-499 handled as BODY_400
+Encryption errors: Logged and returned as error
+Missing endpoints: crawl() catches DeviceException and continues
+
+FIRMWARE VERSION HANDLING
+--------------------------
+IVT/Nefit/Easycontrol: Fetch from /gateway/versionFirmware
+PoinTT API: HARDCODED to "05.00.06" (endpoint doesn't exist)
+
+If firmware version not found: "You might have unsupported firmware version None"
+Firmware version used to load correct database file
+
+BUS TYPES
+---------
+CAN: IVT-specific, detected from system/bus
+EMS: Nefit/Easycontrol/IVT, detected from system/bus or references
+POINTTAPI: PoinTT API constant
+
+Bus type affects circuit selection and database loading
+
+ASYNC/AWAIT PATTERNS
+--------------------
+All connector methods are async: async def get(), async def put()
+All gateway initialization is async: async def initialize()
+Circuit discovery uses async: async def initialize(), async def retrieve_from_module()
+Asyncio locks for thread-safe XMPP request queuing
+Asyncio futures for waiting on responses
+
+CRAWL FUNCTION DETAILED
+------------------------
+Location: helper.py
+Purpose: Recursively discover circuit references
+Parameters:
+- url: Starting URL
+- _list: Result accumulator
+- deep: Recursion depth (0=stop, 1=one level, etc.)
+- get: Connector get method
+- exclude: Regex to exclude certain IDs
+
+Algorithm:
+1. GET url
+2. If response has ID and deep >= 0: Consider for inclusion
+3. If (no REFERENCES or deep == 0) and has ID: Add to _list (leaf node)
+4. Else if has REFERENCES and deep > 0: Recurse for each reference with deep-1
+5. Catch DeviceException and continue (missing endpoints OK)
+
+Critical behavior:
+- Only adds responses to _list at leaf level (no REFERENCES or depth exhausted)
+- REFERENCES key must exist for circuit to be processed by Circuits.initialize()
+- Empty "references": [] counts as having REFERENCES key (valid leaf)
+
+SPECIAL HANDLING IN POINTTAPI
+------------------------------
+1. Hardcoded firmware version in gateway
+2. Mock endpoints for /acCircuits and /ac1 in connector
+3. Override initialize() in ACCircuit to skip STATUS fetch
+4. Bulk endpoints for efficient multi-value fetching
+5. Token refresh with OAuth parameters
+6. UTC timezone-aware timestamps
+7. Dynamic headers callback for BulkEndpoint
+8. URL construction with resource/ prefix handling
+
+COMMON PITFALLS
+---------------
+1. Forgetting REFERENCES key in mock responses (discovery fails silently)
+2. Not calling _ensure_valid_token() before bulk endpoint check (token never refreshes)
+3. Missing OAuth parameters in refresh request (400 error)
+4. Double "resource/" prefix in URLs (database URIs include prefix, connector adds it)
+5. Local timestamps instead of UTC (timezone-aware required)
+6. ACCircuit calling BasicCircuit.initialize() (tries to fetch non-existent STATUS)
+7. Not providing __name__ attribute on mocks (logging fails)
+8. Improper async context manager mocking (AttributeError on mock.__aenter__().status)
+
+========================================
+POINTT API vs STANDARD ARCHITECTURE
+========================================
+
+FUNDAMENTAL DIFFERENCES
+-----------------------
+
+1. PROTOCOL & AUTHENTICATION
+   Standard (XMPP): Persistent stateful XMPP connection, AES encryption, JID-based auth
+   PoinTT API: Stateless HTTPS REST API, OAuth 2.0 PKCE, token-based auth with refresh
+   - No persistent connection to maintain
+   - No custom encryption (TLS only)
+   - Token refresh mechanism required
+   - Cloud-based (not local network)
+
+2. FIRMWARE VERSION DETECTION
+   Standard: GET /gateway/versionFirmware returns actual firmware
+   PoinTT API: Endpoint doesn't exist, HARDCODED to "05.00.06" in gateway
+   Implication: Can't dynamically load different databases per firmware version
+   Workaround: Assume single firmware DB (050006.json)
+
+3. CIRCUIT DISCOVERY ENDPOINTS
+   Standard: Real endpoints exist for circuit discovery
+   - GET /heatingCircuits → {"references": [{"id": "hc1"}, ...]}
+   - GET /heatingCircuits/hc1 → {"references": [], actual circuit data}
+   PoinTT API: Discovery endpoints DON'T EXIST in real API
+   - GET /acCircuits → MOCKED in connector (lines 290-299)
+   - GET /ac1 → MOCKED in connector (lines 304-309)
+   Reason for mocking: API doesn't expose circuit discovery, only knows one AC unit exists
+
+4. CIRCUIT STATUS ENDPOINT
+   Standard: Each circuit has /circuitType/circuitId/status endpoint
+   - BasicCircuit.initialize() fetches STATUS to verify circuit is active
+   PoinTT API: No individual circuit status endpoint exists
+   Workaround: ACCircuit overrides initialize() to set self._state = True directly (line 68)
+
+5. DATA FETCHING PATTERN
+   Standard: Individual GET requests per endpoint
+   - GET /heatingCircuits/hc1/roomtemperature → one value
+   - GET /heatingCircuits/hc1/operationMode → one value
+   - Each property requires separate API call
+   PoinTT API: Bulk endpoint optimization
+   - GET /resource/airConditioning/standardFunctions → ALL values at once
+   - Response contains all 8 properties in one call
+   - BulkEndpoint class caches values and serves individual URI requests from cache
+   - Configured in database: bulk_endpoints key maps endpoint URL to URI list
+   - BulkEndpoint uses headers_callback to get fresh token for each request (token refresh support)
+
+6. URL STRUCTURE
+   Standard: Simple paths
+   - /heatingCircuits/hc1/roomtemperature
+   - /gateway/uuid
+   PoinTT API: "resource/" prefix in all URLs
+   - https://pointt-api.bosch.com/.../gateways/{device_id}/resource/airConditioning/...
+   - _make_url() adds "resource/" prefix if not present (lines 237-242)
+   - Database URIs currently include "resource/" prefix (BUG - double prefix issue)
+   Correct approach: Database URIs should NOT have "resource/" prefix, connector adds it
+
+7. HOST IDENTIFIER
+   Standard: Serial number of physical device (hostname)
+   - Used to build XMPP JID
+   - Direct connection to device
+   PoinTT API: Numeric device ID
+   - Not a network hostname
+   - Used in API URL path
+   - Cloud routing to device
+
+8. CIRCUIT TYPES
+   Standard: HC (heating), DHW (hot water), SC (solar)
+   - Hydronic heating systems
+   - Zone-based control (Easycontrol)
+   PoinTT API: AC (air conditioning)
+   - HVAC system (heat pump based)
+   - Different operation modes: auto, heat, cool, fanOnly
+   - Additional controls: fan speed, airflow direction
+   - Temperature range: 16-30°C (not boiler temps)
+
+9. CIRCUIT DATA STRUCTURE
+   Standard: Multiple circuits of same type
+   - /heatingCircuits with hc1, hc2, hc3, etc.
+   - Each circuit independent
+   - Crawl discovers dynamic list
+   PoinTT API: Single AC circuit
+   - Only one AC unit per device
+   - "ac1" is static, not discovered
+   - Database refs in db_POINTTAPI.json contains fixed "ac1" entry (lines 21-26)
+
+10. DATABASE REFS STRUCTURE
+    Standard: Refs use simple IDs (relative to circuit URI)
+    - refs: {"current_temp": {"id": "roomtemperature", "type": "regular"}}
+    - Circuit constructs full URI: /heatingCircuits/hc1/roomtemperature
+    PoinTT API: Refs use absolute paths
+    - refs: {"current_temp": {"id": "/airConditioning/roomTemperature", "type": "regular"}}
+    - No circuit prefix needed
+    - All data under /airConditioning/ namespace
+
+ARCHITECTURAL MISMATCHES
+-------------------------
+
+WHERE IT FITS WELL:
+1. Connector abstraction: OAuth connector fits cleanly alongside XMPP/HTTP
+2. Gateway initialization: Same flow (init, get info, load DB, init circuits)
+3. Circuit object model: ACCircuit extends BasicCircuit properly
+4. Database system: Firmware-specific DB works (even if hardcoded version)
+5. Switches/sensors: Standard definition format works fine
+6. Async patterns: All async methods integrate seamlessly
+
+WHERE IT'S FORCED TO FIT:
+1. Circuit discovery via crawl()
+   - Crawl expects real endpoints to exist
+   - Must mock /acCircuits and /ac1 responses in connector
+   - Violates separation: connector knows about circuit structure
+   - Better approach: Gateway could provide static circuit list for POINTTAPI
+
+2. Firmware version handling
+   - Architecture expects dynamic firmware detection
+   - Must hardcode version in gateway
+   - Can't support multiple firmware versions dynamically
+   - Better approach: POINTTAPI device type could skip firmware check
+
+3. Circuit STATUS fetching
+   - Architecture expects every circuit to have status endpoint
+   - Must override initialize() to skip STATUS check
+   - ACCircuit knows it's special-cased
+   - Better approach: Make STATUS fetch optional in BasicCircuit
+
+4. URL construction
+   - Standard URIs are simple paths
+   - PoinTT needs "resource/" prefix
+   - Database URIs include prefix, connector adds prefix → double prefix bug
+   - Better approach: Database schema should match other device types (no prefix)
+
+5. Bulk endpoints
+   - Standard architecture fetches properties individually
+   - PoinTT API bundles multiple properties
+   - BulkEndpoint class works but adds complexity
+   - Caching logic in BulkEndpoint must track requests per URI
+   - Better approach: This actually works well, could benefit other device types
+
+WHERE IT BREAKS THE MODEL:
+1. Host parameter semantics
+   - All other devices: host = serial number (network identifier)
+   - PoinTT API: host = device ID (numeric identifier)
+   - Same parameter, different meaning
+   - Could confuse users
+
+2. Discovery endpoint mocking
+   - Connector returning fake data for non-existent endpoints
+   - Breaks the abstraction: connector shouldn't know circuit structure
+   - Hard to maintain: adding ac2 requires changing connector code
+   - Fragile: relies on crawl() calling specific URIs in specific order
+
+DATABASE SCHEMA ISSUES
+----------------------
+
+CURRENT SCHEMA (db_POINTTAPI.json):
+Lines 3-11: Gateway endpoints with "resource/" prefix
+- "uuid": "resource/gateway/uuid"
+- "dateTime": "resource/gateway/DateTime"
+PROBLEM: Connector _make_url() adds "resource/" → double prefix
+FIX: Remove "resource/" from all database URIs
+
+Lines 20-27: acCircuits refs contains "ac1" entry
+- This is circuit reference, not property reference
+- Doesn't match standard schema pattern
+- Standard: circuit refs in firmware DB only
+PROBLEM: Mixing concerns - base DB shouldn't define circuit instances
+FIX: Move ac1 definition to firmware DB or remove entirely (use mocked response)
+
+FIRMWARE SCHEMA (pointtapi/050006.json):
+Lines 281-292: bulk_endpoints configuration
+- Maps /resource/airConditioning/standardFunctions to 8 URIs
+- URIs don't have "resource/" prefix (correct)
+GOOD: This is how it should be done
+
+Lines 250-271: acCircuits.refs with absolute paths
+- "id": "/airConditioning/roomTemperature"
+- Includes leading slash
+INCONSISTENT: Other device types use relative IDs
+REASON: Makes sense for PoinTT since no circuit prefix needed
+
+Lines 4-130: switches with absolute paths
+Lines 132-248: sensors with absolute paths
+CONSISTENT: All use absolute /airConditioning/ paths
+GOOD: Clear and unambiguous
+
+CONNECTOR IMPLEMENTATION ISSUES
+--------------------------------
+
+GOOD PATTERNS:
+1. Token management (lines 129-227)
+   - Loading/saving tokens to secure file
+   - UTC timezone-aware timestamps
+   - Proactive refresh (5 min before expiry)
+   - Handles missing expires_at gracefully
+
+2. BulkEndpoint class (lines 30-71)
+   - Efficient caching
+   - Dynamic headers via callback (token refresh support)
+   - Request tracking to minimize API calls
+
+3. Error handling (lines 277-284)
+   - Proper exception mapping
+   - Clear error messages
+
+4. OAuth flow methods (lines 343-483)
+   - Complete PKCE implementation
+   - Browser integration
+   - Code extraction and token exchange
+
+PROBLEMATIC PATTERNS:
+1. Mocked endpoints in get() (lines 286-309)
+   - Connector returning fake data
+   - Hardcoded circuit structure ("ac1")
+   - Should be in gateway or database layer
+   - Makes connector non-generic
+
+2. Token refresh placement (line 312)
+   - _ensure_valid_token() called AFTER mock endpoint checks
+   - If mocked endpoints needed auth, this would fail
+   - Currently OK since mocks return before auth check
+   - Fragile ordering dependency
+
+3. URL prefix handling (lines 237-242)
+   - Strips /resource/ prefix if present
+   - Adds resource/ to base URL
+   - Works but error-prone
+   - Should be consistent: either always add or never add
+
+4. _request() bypasses lock (line 318)
+   - get() and put() acquire lock
+   - _request() called with lock already held
+   - Lock not protecting individual HTTP requests
+   - Probably OK since HTTP is stateless
+   - Different from XMPP where lock prevents message interleaving
+
+GATEWAY IMPLEMENTATION ISSUES
+------------------------------
+
+GOOD PATTERNS (gateway/pointtapi.py):
+1. Bulk endpoint initialization (lines 112-114)
+   - Loads bulk_endpoints from database
+   - Calls connector.add_bulk_endpoint()
+   - Clean integration
+
+2. Firmware version handling (line 88)
+   - Clear comment explaining hardcoded version
+   - Sets version in _data[GATEWAY][FIRMWARE_VERSION]
+   - Rest of system sees it as normal firmware version
+
+3. Bus type setting (line 101)
+   - Sets self._bus_type = POINTTAPI
+   - Used for circuit type selection
+   - Consistent with IVT/Nefit/Easycontrol pattern
+
+PROBLEMATIC PATTERNS:
+1. Circuit type initialization (line 60)
+   - _data initialized with {GATEWAY: {}, AC: None, SENSORS: None}
+   - Why AC: None? Other gateways don't pre-initialize circuit types
+   - Creates empty slot before initialize_circuits() called
+   - Inconsistent with base gateway pattern
+
+2. No validation of firmware (line 88)
+   - Hardcoded version never validated
+   - What if actual firmware is different?
+   - Can't detect firmware updates
+   - Locked to single database forever
+
+ACCIRCUIT IMPLEMENTATION ISSUES
+--------------------------------
+
+GOOD PATTERNS (circuits/pointtapi/ac.py):
+1. Override initialize() (lines 61-71)
+   - Clear docstring explaining why
+   - Sets _state = True without STATUS fetch
+   - Initializes switches properly
+   - Clean workaround for missing endpoint
+
+2. URI constants (lines 53-59)
+   - Private attributes for each endpoint
+   - Centralized URI definition
+   - Easy to change if API changes
+
+3. Property accessors (lines 74-154)
+   - Consistent pattern with try/except
+   - Returns None on error
+   - Clean interface
+
+4. Control methods (lines 178-285)
+   - Validation before API calls
+   - Proper logging
+   - Async await pattern
+   - Returns bool for success/failure
+
+PROBLEMATIC PATTERNS:
+1. Hardcoded URIs (lines 53-59)
+   - URIs duplicated from database
+   - Not using self._data from BasicCircuit
+   - Should use _db.get(REFS) like standard circuits
+   - Bypasses ref abstraction layer
+
+2. get_value() method usage (lines 77, 85, 93, etc.)
+   - Calling self.get_value(uri)
+   - Where is get_value() defined?
+   - Not in BasicCircuit
+   - Might be broken?
+
+3. No use of refs from database
+   - Database has acCircuits.refs defined
+   - ACCircuit doesn't use them
+   - BasicCircuit.__init__ sets up _data from refs
+   - ACCircuit ignores this and uses hardcoded URIs
+   - Inconsistent with architecture
+
+ARCHITECTURAL FIT ASSESSMENT
+-----------------------------
+
+COMPATIBILITY SCORE: 6/10
+
+WHAT WORKS (fits naturally):
++ Connector abstraction layer: OAuth fits as cleanly as XMPP
++ Gateway initialization flow: Same pattern as other devices
++ Circuit object model: ACCircuit properly extends BasicCircuit
++ Database system: Firmware DB structure reusable
++ Async patterns: All async/await integrates seamlessly
++ Switches/sensors: Standard format works
++ Bulk endpoints: Actually an improvement, could benefit other types
+
+WHAT'S FORCED (workarounds required):
+- Circuit discovery: Must mock endpoints that don't exist
+- Firmware version: Must hardcode instead of detect
+- STATUS endpoint: Must override initialize() to skip
+- URL structure: "resource/" prefix handling awkward
+~ Single circuit: Architecture expects multiple circuits per type
+~ Cloud vs local: API fundamentally different but connector abstracts it
+
+WHAT'S BROKEN (violates architecture):
+! Connector returning fake circuit data: Breaks separation of concerns
+! Database URIs with resource/ prefix: Causes double prefix bug
+! Host parameter semantics: Different meaning than other devices
+! ACCircuit not using refs system: Bypasses architecture
+
+RECOMMENDATION
+--------------
+
+The PoinTT API CAN fit into this architecture but needs adjustments:
+
+MUST FIX (critical bugs):
+1. Remove "resource/" prefix from all db_POINTTAPI.json URIs
+2. Fix ACCircuit to use refs from database (not hardcoded URIs)
+3. Fix ACCircuit.get_value() - method doesn't exist in BasicCircuit
+4. Move circuit discovery mocks from connector to gateway
+
+SHOULD FIX (architectural cleanup):
+5. Make circuit discovery pluggable (gateway provides circuit list for POINTTAPI)
+6. Make STATUS fetch optional in BasicCircuit (add has_status_endpoint DB flag)
+7. Make firmware version optional (add requires_firmware_version gateway flag)
+8. Document host parameter difference (add type hints and docstrings)
+
+COULD IMPROVE (optimization):
+9. Consider bulk endpoint pattern for other device types
+10. Add retry logic for token refresh failures
+11. Cache token in memory (avoid file I/O on every request)
+12. Add circuit count to database (acCircuits: {"count": 1, "refs": {...}})
+
+ALTERNATIVE APPROACH
+--------------------
+
+Instead of forcing PoinTT into circuit discovery pattern, could:
+1. Gateway detects device_type == POINTTAPI
+2. Gateway creates ACCircuit directly without crawling
+3. Circuit uses refs from database like normal
+4. No mocked endpoints needed in connector
+5. Cleaner separation of concerns
+
+Pseudocode:
+```python
+# In PoinTTAPIGateway.initialize_circuits()
+if circ_type == AC:
+    # Skip crawl, create circuit directly
+    circuit_data = {"id": "ac1", "type": "airConditioning", "references": []}
+    circuit = ACCircuit(self._connector, circuit_data, self._db, ...)
+    await circuit.initialize()
+    self._data[AC] = Circuits(...)
+    self._data[AC]._items = [circuit]
+else:
+    # Standard crawl-based discovery
+    await super().initialize_circuits(circ_type)
+```
+
+This would eliminate mocked endpoints and make intent clearer.
+
+CONCLUSION
+----------
+
+PoinTT API is fundamentally different (cloud OAuth REST vs local XMPP) but the connector abstraction handles this well. The main issues are:
+1. Trying to fake circuit discovery instead of providing static circuit list
+2. Database schema with resource/ prefix causing double prefix
+3. ACCircuit not using the refs system properly
+
+With the fixes above, PoinTT API would fit cleanly into the architecture. Current implementation works but is fragile and violates several architectural principles.
+
+The bulk endpoint pattern is actually the best part of this integration and should be considered for other device types to reduce API calls.
