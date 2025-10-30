@@ -18,7 +18,7 @@ from bosch_thermostat_client.const import (
     REFERENCES,
 )
 from bosch_thermostat_client.const.ivt import SYSTEM_INFO
-from bosch_thermostat_client.const.pointtapi import CIRCUIT_TYPES
+from bosch_thermostat_client.const.pointtapi import CIRCUIT_TYPES, CIRCUIT_TYPES as POINTTAPI_CIRCUIT_TYPES
 from bosch_thermostat_client.exceptions import DeviceException, FirmwareException, UnknownDevice
 from bosch_thermostat_client.db import get_db_of_firmware, async_get_errors
 from bosch_thermostat_client.circuits import Circuits
@@ -157,11 +157,12 @@ class PoinTTAPIGateway(BaseGateway):
             CircuitClass = choose_circuit_type(self.device_type, circ_type)
 
             # Create the AC circuit directly
+            # Note: _type should be the database key (e.g., "acCircuits"), not the const (e.g., "ac")
             circuit_object = CircuitClass(
                 connector=self._connector,
                 attr_id=circuit_id,
                 db=self._db,
-                _type=circ_type,
+                _type=POINTTAPI_CIRCUIT_TYPES[circ_type],  # Maps AC -> "acCircuits"
                 bus_type=self._bus_type,
             )
 

@@ -17,14 +17,6 @@
       "type": "POINTTAPI"
     }
   },
-  "acCircuits": {
-    "refs": {
-      "ac1": {
-        "id": "ac1",
-        "type": "airConditioning"
-      }
-    }
-  },
   "_unsupported": {
     "brand": "/system/brand",
     "systemInfo": "/system/info",

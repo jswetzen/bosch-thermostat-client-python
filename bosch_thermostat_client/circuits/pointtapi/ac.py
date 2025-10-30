@@ -18,6 +18,10 @@ _LOGGER = logging.getLogger(__name__)
 class ACCircuit(BasicCircuit):
     """Air Conditioning circuit for PoinTT API devices."""
 
+    # Override allowed types to include all AC property types
+    # PoinTT API uses "regular", "operation_mode", and "setpoint" types
+    _allowed_types = ("regular", "binary", "operation_mode", "setpoint", "number")
+
     # AC-specific operation modes
     AC_MODE_AUTO = "auto"
     AC_MODE_HEAT = "heat"
