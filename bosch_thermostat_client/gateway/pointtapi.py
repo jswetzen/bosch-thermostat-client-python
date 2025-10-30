@@ -181,3 +181,10 @@ class PoinTTAPIGateway(BaseGateway):
         else:
             # For other circuit types (HC, DHW, etc.), use standard discovery
             await super().initialize_circuits(circ_type)
+
+    @property
+    def ac_circuits(self):
+        """Get AC circuit list."""
+        if AC in self._data and self._data[AC]:
+            return self._data[AC].circuits
+        return []

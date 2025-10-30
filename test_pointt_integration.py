@@ -74,7 +74,8 @@ async def main():
         # Initialize AC circuits
         print(f"\n3. Initializing AC circuits...")
         try:
-            circuits = await gateway.initialize_circuits(AC)
+            await gateway.initialize_circuits(AC)
+            circuits = gateway.ac_circuits
             if circuits:
                 print(f"   ✓ Found {len(circuits)} AC circuit(s)")
                 for circuit in circuits:
