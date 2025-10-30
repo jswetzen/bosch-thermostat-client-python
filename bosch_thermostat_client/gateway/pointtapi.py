@@ -22,7 +22,7 @@ from bosch_thermostat_client.const.pointtapi import CIRCUIT_TYPES
 from bosch_thermostat_client.exceptions import DeviceException, FirmwareException, UnknownDevice
 from bosch_thermostat_client.db import get_db_of_firmware, async_get_errors
 from bosch_thermostat_client.circuits import Circuits
-from bosch_thermostat_client.circuits.circuits import create_circuit
+from bosch_thermostat_client.circuits.circuits import choose_circuit_type
 
 from .base import BaseGateway
 
@@ -151,21 +151,18 @@ class PoinTTAPIGateway(BaseGateway):
 
             # Create static circuit data for the single AC unit
             # This replaces the need for /acCircuits and /ac1 endpoints
-            circuit_data = {
-                ID: "ac1",
-                TYPE: "airConditioning",
-                REFERENCES: []  # Empty array indicates it's a leaf node
-            }
+            circuit_id = "ac1"
+
+            # Get the circuit class for AC + POINTTAPI
+            CircuitClass = choose_circuit_type(self.device_type, circ_type)
 
             # Create the AC circuit directly
-            circuit_object = create_circuit(
-                circuit_data,
-                self._connector,
-                self._db,
-                circ_type,
-                self._bus_type,
-                self.device_type,
-                self.current_date
+            circuit_object = CircuitClass(
+                connector=self._connector,
+                attr_id=circuit_id,
+                db=self._db,
+                _type=circ_type,
+                bus_type=self._bus_type,
             )
 
             if circuit_object:
