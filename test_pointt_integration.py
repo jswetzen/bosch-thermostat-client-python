@@ -13,10 +13,14 @@ import asyncio
 import json
 import pickle
 import aiohttp
+import logging
 from pathlib import Path
 
 from bosch_thermostat_client.const import POINTTAPI, AC
 from bosch_thermostat_client.gateway import gateway_chooser
+
+# Enable debug logging to troubleshoot issues
+logging.basicConfig(level=logging.DEBUG, format='%(name)s - %(levelname)s - %(message)s')
 
 
 async def main():
@@ -82,6 +86,12 @@ async def main():
                     print(f"   - Circuit ID: {circuit.attr_id}")
             else:
                 print(f"   ✗ No AC circuits found")
+                # Debug: check gateway state
+                if AC in gateway._data and gateway._data[AC]:
+                    print(f"   DEBUG: gateway._data[AC] exists")
+                    print(f"   DEBUG: gateway._data[AC]._items = {gateway._data[AC]._items}")
+                else:
+                    print(f"   DEBUG: gateway._data[AC] is None or missing")
                 return
         except Exception as e:
             print(f"   ✗ Error initializing circuits: {e}")
