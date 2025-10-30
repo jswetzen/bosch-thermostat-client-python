@@ -73,11 +73,23 @@ class ACCircuit(BasicCircuit):
         PoinTT API doesn't have individual circuit endpoints - all data comes from
         the bulk endpoint. We just mark the circuit as active and initialize switches.
         """
+        _LOGGER.debug("ACCircuit.initialize() called")
         # Mark circuit as active (no STATUS endpoint to fetch)
         self._state = True
+        _LOGGER.debug("ACCircuit state set to True")
+
         # Initialize switches if database has them
         from bosch_thermostat_client.const import SWITCHES
-        await self._switches.initialize(switches=self._db.get(SWITCHES))
+        switches_data = self._db.get(SWITCHES)
+        _LOGGER.debug(f"Switches data from DB: {switches_data is not None and len(switches_data) if switches_data else 0} switches")
+
+        try:
+            await self._switches.initialize(switches=switches_data)
+            _LOGGER.debug("Switches initialized successfully")
+        except Exception as e:
+            _LOGGER.error(f"Failed to initialize switches: {e}", exc_info=True)
+            # Don't let switch initialization failure prevent circuit from working
+            pass
 
     @property
     def current_temp(self):

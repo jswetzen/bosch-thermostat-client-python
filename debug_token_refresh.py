@@ -80,6 +80,16 @@ async def main():
             await gateway.initialize_circuits(AC)
             circuits = gateway.ac_circuits  # Access via property, not return value
             print(f"   Found {len(circuits)} circuits")
+
+            # Debug: Check if circuit was created but filtered out
+            if len(circuits) == 0:
+                print("\n   DEBUG: No circuits found - checking gateway._data...")
+                if AC in gateway._data and gateway._data[AC]:
+                    print(f"   - gateway._data[AC] exists: {gateway._data[AC]}")
+                    print(f"   - gateway._data[AC]._items: {gateway._data[AC]._items}")
+                else:
+                    print(f"   - gateway._data[AC] is None or missing")
+
         except Exception as e:
             print(f"   ERROR: {e}")
             import traceback

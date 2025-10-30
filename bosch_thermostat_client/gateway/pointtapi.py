@@ -158,19 +158,30 @@ class PoinTTAPIGateway(BaseGateway):
 
             # Create the AC circuit directly
             # Note: _type should be the database key (e.g., "acCircuits"), not the const (e.g., "ac")
-            circuit_object = CircuitClass(
-                connector=self._connector,
-                attr_id=circuit_id,
-                db=self._db,
-                _type=POINTTAPI_CIRCUIT_TYPES[circ_type],  # Maps AC -> "acCircuits"
-                bus_type=self._bus_type,
-            )
+            try:
+                circuit_object = CircuitClass(
+                    connector=self._connector,
+                    attr_id=circuit_id,
+                    db=self._db,
+                    _type=POINTTAPI_CIRCUIT_TYPES[circ_type],  # Maps AC -> "acCircuits"
+                    bus_type=self._bus_type,
+                )
+                _LOGGER.debug(f"Created AC circuit object: {circuit_object}")
+            except Exception as e:
+                _LOGGER.error(f"Failed to create AC circuit object: {e}", exc_info=True)
+                return
 
             if circuit_object:
-                await circuit_object.initialize()
+                try:
+                    await circuit_object.initialize()
+                    _LOGGER.debug(f"AC circuit initialized, state={circuit_object.state}")
+                except Exception as e:
+                    _LOGGER.error(f"Failed to initialize AC circuit: {e}", exc_info=True)
+                    return
+
                 if circuit_object.state:
                     self._data[circ_type]._items.append(circuit_object)
-                    _LOGGER.debug("Initialized AC circuit: ac1")
+                    _LOGGER.info("Successfully initialized AC circuit: ac1")
                 else:
                     _LOGGER.warning("AC circuit ac1 failed to initialize (state=False)")
             else:
