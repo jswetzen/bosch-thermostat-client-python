@@ -77,7 +77,8 @@ async def main():
 
         print("\n7. Attempting to initialize circuits...")
         try:
-            circuits = await gateway.initialize_circuits(AC)
+            await gateway.initialize_circuits(AC)
+            circuits = gateway.ac_circuits  # Access via property, not return value
             print(f"   Found {len(circuits)} circuits")
         except Exception as e:
             print(f"   ERROR: {e}")
