@@ -1,14 +1,14 @@
 {
-  "versionFirmwarePath": "resource/gateway/versionFirmware",
+  "versionFirmwarePath": "/gateway/versionFirmware",
   "gateway": {
-    "uuid": "resource/gateway/uuid",
-    "dateTime": "resource/gateway/DateTime",
-    "versionFirmware": "resource/gateway/versionFirmware",
-    "versionHardware": "resource/gateway/versionHardware",
-    "serialId": "resource/gateway/serialId",
-    "timeZone": "resource/gateway/tzInfo/timeZone",
-    "systemBus": "resource/system/bus",
-    "model": "resource/system/appliance/model"
+    "uuid": "/gateway/uuid",
+    "dateTime": "/gateway/DateTime",
+    "versionFirmware": "/gateway/versionFirmware",
+    "versionHardware": "/gateway/versionHardware",
+    "serialId": "/gateway/serialId",
+    "timeZone": "/gateway/tzInfo/timeZone",
+    "systemBus": "/system/bus",
+    "model": "/system/appliance/model"
   },
   "models": {
     "POINTTAPI": {

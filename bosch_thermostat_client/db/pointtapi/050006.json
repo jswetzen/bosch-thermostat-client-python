@@ -278,7 +278,7 @@
       }
     },
     "bulk_endpoints": {
-        "/resource/airConditioning/standardFunctions":
+        "/airConditioning/standardFunctions":
         [
             "/airConditioning/operationMode",
             "/airConditioning/acControl",

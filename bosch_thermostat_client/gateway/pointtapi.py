@@ -14,11 +14,15 @@ from bosch_thermostat_client.const import (
     VALUES,
     FIRMWARE_VERSION,
     TYPE,
+    ID,
+    REFERENCES,
 )
 from bosch_thermostat_client.const.ivt import SYSTEM_INFO
 from bosch_thermostat_client.const.pointtapi import CIRCUIT_TYPES
 from bosch_thermostat_client.exceptions import DeviceException, FirmwareException, UnknownDevice
 from bosch_thermostat_client.db import get_db_of_firmware, async_get_errors
+from bosch_thermostat_client.circuits import Circuits
+from bosch_thermostat_client.circuits.circuits import create_circuit
 
 from .base import BaseGateway
 
@@ -129,3 +133,51 @@ class PoinTTAPIGateway(BaseGateway):
         # Set bus_type to POINTTAPI for proper circuit initialization
         self._bus_type = POINTTAPI
         return _db.get(MODELS).get(POINTTAPI)
+
+    async def initialize_circuits(self, circ_type):
+        """Initialize circuits for PoinTT API.
+
+        PoinTT API doesn't expose circuit discovery endpoints. We create the single
+        AC circuit directly instead of using the crawl() discovery mechanism.
+        """
+        if circ_type == AC:
+            # Create Circuits container
+            self._data[circ_type] = Circuits(
+                self._connector,
+                circ_type,
+                self._bus_type,
+                self.device_type
+            )
+
+            # Create static circuit data for the single AC unit
+            # This replaces the need for /acCircuits and /ac1 endpoints
+            circuit_data = {
+                ID: "ac1",
+                TYPE: "airConditioning",
+                REFERENCES: []  # Empty array indicates it's a leaf node
+            }
+
+            # Create the AC circuit directly
+            circuit_object = create_circuit(
+                circuit_data,
+                self._connector,
+                self._db,
+                circ_type,
+                self._bus_type,
+                self.device_type,
+                self.current_date
+            )
+
+            if circuit_object:
+                await circuit_object.initialize()
+                if circuit_object.state:
+                    self._data[circ_type]._items.append(circuit_object)
+                    _LOGGER.debug("Initialized AC circuit: ac1")
+                else:
+                    _LOGGER.warning("AC circuit ac1 failed to initialize (state=False)")
+            else:
+                _LOGGER.warning("Failed to create AC circuit object")
+
+        else:
+            # For other circuit types (HC, DHW, etc.), use standard discovery
+            await super().initialize_circuits(circ_type)

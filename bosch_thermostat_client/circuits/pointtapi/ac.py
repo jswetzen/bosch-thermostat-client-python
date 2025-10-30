@@ -46,17 +46,22 @@ class ACCircuit(BasicCircuit):
     AIRFLOW_V_SWING = "swing"
 
     def __init__(self, connector, attr_id, db, _type, bus_type, **kwargs):
-        """Initialize AC circuit."""
+        """Initialize AC circuit.
+
+        PoinTT API uses absolute paths in refs, not relative paths like other circuits.
+        We need to override the URI construction from BasicCircuit to use the ref IDs directly.
+        """
+        # Call parent init but we'll override the _data URIs
         super().__init__(connector, attr_id, db, _type, bus_type, **kwargs)
 
-        # AC-specific URIs based on PoinTT API schema
-        self._operation_mode_uri = "/airConditioning/operationMode"
-        self._ac_control_uri = "/airConditioning/acControl"
-        self._temperature_setpoint_uri = "/airConditioning/temperatureSetpoint"
-        self._room_temperature_uri = "/airConditioning/roomTemperature"
-        self._fan_speed_uri = "/airConditioning/fanSpeed"
-        self._airflow_horizontal_uri = "/airConditioning/airFlowHorizontal"
-        self._airflow_vertical_uri = "/airConditioning/airFlowVertical"
+        # Override URIs from BasicCircuit - PoinTT uses absolute paths
+        # BasicCircuit constructs: uri = f"{self._main_uri}/{value[ID]}"
+        # But PoinTT refs already have the full path in ID
+        from bosch_thermostat_client.const import REFS, ID, URI, TYPE, RESULT
+        if REFS in self._db:
+            for key, value in self._db[REFS].items():
+                # Use the ID directly as URI (it's already absolute for PoinTT)
+                self._data[key] = {RESULT: {}, URI: value[ID], TYPE: value[TYPE]}
 
     async def initialize(self):
         """Initialize AC circuit.
@@ -74,7 +79,7 @@ class ACCircuit(BasicCircuit):
     def current_temp(self):
         """Get current room temperature."""
         try:
-            return self.get_value(self._room_temperature_uri)
+            return self.get_value("current_temp")
         except (KeyError, AttributeError):
             return None
 
@@ -82,7 +87,7 @@ class ACCircuit(BasicCircuit):
     def target_temperature(self):
         """Get target temperature setpoint."""
         try:
-            return self.get_value(self._temperature_setpoint_uri)
+            return self.get_value("target_temp")
         except (KeyError, AttributeError):
             return None
 
@@ -90,7 +95,7 @@ class ACCircuit(BasicCircuit):
     def operation_mode(self):
         """Get current operation mode."""
         try:
-            return self.get_value(self._operation_mode_uri)
+            return self.get_value("operation_mode")
         except (KeyError, AttributeError):
             return None
 
@@ -98,7 +103,9 @@ class ACCircuit(BasicCircuit):
     def fan_speed(self):
         """Get current fan speed."""
         try:
-            return self.get_value(self._fan_speed_uri)
+            # fan_speed not in acCircuits.refs, will need to access differently
+            # For now return None, can be added to refs if needed
+            return None
         except (KeyError, AttributeError):
             return None
 
@@ -106,7 +113,8 @@ class ACCircuit(BasicCircuit):
     def air_flow_horizontal(self):
         """Get horizontal air flow direction."""
         try:
-            return self.get_value(self._airflow_horizontal_uri)
+            # airflow not in acCircuits.refs, will need to access differently
+            return None
         except (KeyError, AttributeError):
             return None
 
@@ -114,7 +122,8 @@ class ACCircuit(BasicCircuit):
     def air_flow_vertical(self):
         """Get vertical air flow direction."""
         try:
-            return self.get_value(self._airflow_vertical_uri)
+            # airflow not in acCircuits.refs, will need to access differently
+            return None
         except (KeyError, AttributeError):
             return None
 
@@ -122,7 +131,7 @@ class ACCircuit(BasicCircuit):
     def is_on(self):
         """Check if AC is turned on."""
         try:
-            ac_control = self.get_value(self._ac_control_uri)
+            ac_control = self.get_value("status")  # status ref maps to acControl
             return ac_control == "on"
         except (KeyError, AttributeError):
             return False
@@ -187,7 +196,8 @@ class ACCircuit(BasicCircuit):
             return False
 
         try:
-            result = await self._connector.put(self._temperature_setpoint_uri, temperature)
+            uri = self._data["target_temp"][URI]
+            result = await self._connector.put(uri, temperature)
             if result:
                 _LOGGER.debug("Set temperature to %s°C", temperature)
                 return True
@@ -203,7 +213,8 @@ class ACCircuit(BasicCircuit):
             return False
 
         try:
-            result = await self._connector.put(self._operation_mode_uri, mode)
+            uri = self._data["operation_mode"][URI]
+            result = await self._connector.put(uri, mode)
             if result:
                 _LOGGER.debug("Set operation mode to %s", mode)
                 return True
@@ -219,7 +230,9 @@ class ACCircuit(BasicCircuit):
             return False
 
         try:
-            result = await self._connector.put(self._fan_speed_uri, speed)
+            # Fan speed would need to be added to refs, using direct URI for now
+            uri = "/airConditioning/fanSpeed"
+            result = await self._connector.put(uri, speed)
             if result:
                 _LOGGER.debug("Set fan speed to %s", speed)
                 return True
@@ -235,7 +248,9 @@ class ACCircuit(BasicCircuit):
             return False
 
         try:
-            result = await self._connector.put(self._airflow_horizontal_uri, direction)
+            # Airflow would need to be added to refs, using direct URI for now
+            uri = "/airConditioning/airFlowHorizontal"
+            result = await self._connector.put(uri, direction)
             if result:
                 _LOGGER.debug("Set horizontal air flow to %s", direction)
                 return True
@@ -251,7 +266,9 @@ class ACCircuit(BasicCircuit):
             return False
 
         try:
-            result = await self._connector.put(self._airflow_vertical_uri, direction)
+            # Airflow would need to be added to refs, using direct URI for now
+            uri = "/airConditioning/airFlowVertical"
+            result = await self._connector.put(uri, direction)
             if result:
                 _LOGGER.debug("Set vertical air flow to %s", direction)
                 return True
@@ -263,7 +280,8 @@ class ACCircuit(BasicCircuit):
     async def turn_on(self):
         """Turn the AC on."""
         try:
-            result = await self._connector.put(self._ac_control_uri, "on")
+            uri = self._data["status"][URI]
+            result = await self._connector.put(uri, "on")
             if result:
                 _LOGGER.debug("Turned AC on")
                 return True
@@ -275,7 +293,8 @@ class ACCircuit(BasicCircuit):
     async def turn_off(self):
         """Turn the AC off."""
         try:
-            result = await self._connector.put(self._ac_control_uri, "off")
+            uri = self._data["status"][URI]
+            result = await self._connector.put(uri, "off")
             if result:
                 _LOGGER.debug("Turned AC off")
                 return True
