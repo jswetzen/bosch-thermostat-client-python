@@ -37,9 +37,12 @@ async def main():
         print("\n2. Creating gateway...")
         GatewayClass = gateway_chooser(POINTTAPI)
         gateway = GatewayClass(
-            device_id=DEVICE_ID,
-            access_token=tokens['access_token'],
             session=session,
+            session_type="HTTP",
+            host=DEVICE_ID,
+            access_key=None,
+            access_token=tokens['access_token'],
+            refresh_token=tokens.get('refresh_token'),
             token_file=TOKEN_FILE
         )
 

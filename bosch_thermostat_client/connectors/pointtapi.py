@@ -96,14 +96,15 @@ class PoinTTAPIConnector:
         "bacon",
     ]
 
-    def __init__(self, host, access_token, device_type=POINTTAPI, token_file="tokens.json", **kwargs):
+    def __init__(self, host, access_token, refresh_token=None, device_type=POINTTAPI, token_file=None, **kwargs):
         """Init PoinTT API connector.
 
         Args:
             host: Device ID for the PoinTT API (not a hostname)
             access_token: OAuth access token
+            refresh_token: OAuth refresh token (optional, for token renewal)
             device_type: Device type constant
-            token_file: Path to token storage file
+            token_file: Path to token storage file (optional, for standalone use)
             **kwargs: Additional arguments including 'loop' for websession
         """
         self._lock = asyncio.Lock()
@@ -112,19 +113,20 @@ class PoinTTAPIConnector:
         self._websession = kwargs.get("loop")
         self._request_timeout = 30
         self.device_type = device_type
-        self._token_file = Path(token_file)
+        self._token_file = Path(token_file) if token_file else None
 
         # OAuth token management
         self._access_token = access_token
-        self._refresh_token = None
+        self._refresh_token = refresh_token
         self._token_expires_at = None
 
         # Bulk request management
         self._bulk_endpoints = {}
         self._uri_bulk_endpoints = {}
 
-        # Load existing tokens if available
-        self._load_tokens()
+        # Load existing tokens if available (only if token_file provided)
+        if self._token_file:
+            self._load_tokens()
 
     def _load_tokens(self):
         """Load tokens from JSON file if it exists."""
@@ -154,7 +156,15 @@ class PoinTTAPIConnector:
             _LOGGER.warning("Could not load tokens from %s: %s", self._token_file, e)
 
     def _save_tokens(self):
-        """Save tokens to JSON file with secure permissions."""
+        """Save tokens to JSON file with secure permissions.
+
+        Only saves if token_file was provided during initialization.
+        For Home Assistant integration, tokens are managed by HA via entry.data.
+        """
+        if not self._token_file:
+            _LOGGER.debug("Token file not configured, skipping save (using HA entry.data)")
+            return
+
         try:
             tokens = {
                 'access_token': self._access_token,

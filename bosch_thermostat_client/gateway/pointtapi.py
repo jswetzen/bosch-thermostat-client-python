@@ -37,32 +37,40 @@ class PoinTTAPIGateway(BaseGateway):
 
     def __init__(
         self,
-        device_id,
+        session,
+        session_type,
+        host,
+        access_key,
         access_token,
-        session=None,
-        token_file="tokens.json",
+        refresh_token=None,
+        token_file=None,
     ):
         """PoinTT API Gateway constructor
 
         Args:
-            device_id (str): Device ID for the PoinTT API
+            session: aiohttp session for HTTP requests (required for PoinTT)
+            session_type (str): Protocol type (accepted for compatibility, ignored - always HTTP)
+            host (str): Device ID for the PoinTT API
+            access_key: Not used for OAuth (accepted for compatibility with HA)
             access_token (str): OAuth access token
-            session: HTTP session for API requests
-            token_file (str): Path to token storage file
+            refresh_token (str, optional): OAuth refresh token for token renewal
+            token_file (str, optional): Path to token storage file (for standalone use, not HA)
         """
-        self._device_id = device_id
+        self._device_id = host  # For PoinTT API, host is the device ID
         self._access_token = access_token
+        self._refresh_token = refresh_token
 
         # Use the connector chooser to get the right connector
         Connector = connector_ivt_chooser(POINTTAPI)
         self._connector = Connector(
-            host=device_id,  # For PoinTT API, host is the device ID
+            host=host,  # Device ID
             access_token=access_token,
+            refresh_token=refresh_token,
             loop=session,
             token_file=token_file,
         )
         self._data = {GATEWAY: {}, AC: None, SENSORS: None}
-        super().__init__(device_id)
+        super().__init__(host)
 
     async def _update_info(self, initial_db):
         """Update gateway info from Bosch device."""
@@ -197,3 +205,53 @@ class PoinTTAPIGateway(BaseGateway):
         if AC in self._data and self._data[AC]:
             return self._data[AC].circuits
         return []
+
+    @property
+    def access_token(self):
+        """Return current OAuth access token.
+
+        May differ from initial token if refresh occurred.
+        Home Assistant should read this after operations and update
+        entry.data if it changed.
+        """
+        return self._connector._access_token
+
+    @property
+    def access_key(self):
+        """Return None - OAuth doesn't use access_key.
+
+        Provided for compatibility with Home Assistant's standard pattern.
+        """
+        return None
+
+    @property
+    def refresh_token(self):
+        """Return current OAuth refresh token.
+
+        Home Assistant should store this in entry.data for persistence.
+        """
+        return self._connector._refresh_token
+
+    @property
+    def token_expires_at(self):
+        """Return token expiration timestamp as ISO string.
+
+        Returns:
+            str: ISO format timestamp (e.g., "2025-10-30T15:30:00+00:00")
+            None: If expiration not set
+        """
+        if self._connector._token_expires_at:
+            return self._connector._token_expires_at.isoformat()
+        return None
+
+    async def check_firmware_validity(self):
+        """Check firmware validity.
+
+        PoinTT API doesn't expose firmware version endpoint.
+        We hardcode firmware version during initialize(), so if
+        the database loaded successfully, firmware is valid.
+
+        Returns:
+            bool: Always True for PoinTT API
+        """
+        return True

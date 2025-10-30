@@ -229,9 +229,12 @@ async def test_pointtapi_gateway_initialization():
     # Initialize gateway
     GatewayClass = gateway_chooser(POINTTAPI)
     gateway = GatewayClass(
-        device_id="101638933",
-        access_token="mock_access_token",
         session=mock_session,
+        session_type="HTTP",
+        host="101638933",
+        access_key=None,
+        access_token="mock_access_token",
+        refresh_token=None,
         token_file="/tmp/test_tokens.json"
     )
 
@@ -258,9 +261,12 @@ async def test_pointtapi_circuit_discovery():
     # Initialize gateway
     GatewayClass = gateway_chooser(POINTTAPI)
     gateway = GatewayClass(
-        device_id="101638933",
-        access_token="mock_access_token",
         session=mock_session,
+        session_type="HTTP",
+        host="101638933",
+        access_key=None,
+        access_token="mock_access_token",
+        refresh_token=None,
         token_file="/tmp/test_tokens.json"
     )
 
@@ -297,9 +303,12 @@ async def test_pointtapi_only_valid_endpoints():
     # Initialize gateway
     GatewayClass = gateway_chooser(POINTTAPI)
     gateway = GatewayClass(
-        device_id="101638933",
-        access_token="mock_access_token",
         session=mock_session,
+        session_type="HTTP",
+        host="101638933",
+        access_key=None,
+        access_token="mock_access_token",
+        refresh_token=None,
         token_file="/tmp/test_tokens.json"
     )
 
@@ -352,9 +361,12 @@ async def test_pointtapi_circuit_reads_values():
     # Initialize gateway
     GatewayClass = gateway_chooser(POINTTAPI)
     gateway = GatewayClass(
-        device_id="101638933",
-        access_token="mock_access_token",
         session=mock_session,
+        session_type="HTTP",
+        host="101638933",
+        access_key=None,
+        access_token="mock_access_token",
+        refresh_token=None,
         token_file="/tmp/test_tokens.json"
     )
 
@@ -400,9 +412,12 @@ async def test_pointtapi_bulk_endpoint_optimization():
     # Initialize gateway
     GatewayClass = gateway_chooser(POINTTAPI)
     gateway = GatewayClass(
-        device_id="101638933",
-        access_token="mock_access_token",
         session=mock_session,
+        session_type="HTTP",
+        host="101638933",
+        access_key=None,
+        access_token="mock_access_token",
+        refresh_token=None,
         token_file="/tmp/test_tokens.json"
     )
 
