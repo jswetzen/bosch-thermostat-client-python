@@ -19,7 +19,7 @@ async def test_ha_instantiation():
     # Simulate HA config entry data
     config_entry_data = {
         "uuid": "test-uuid-12345",
-        "address": "101638933",  # device_id
+        "address": "123456789",  # Example device_id
         "protocol": "HTTP",
         "device_type": "POINTTAPI",
         "access_key": None,  # OAuth doesn't use this
@@ -159,7 +159,7 @@ async def test_backward_compatibility():
         gateway = GatewayClass(
             session=mock_session,
             session_type="HTTP",
-            host="101638933",
+            host="123456789",  # Example device_id
             access_key=None,
             access_token="standalone_token",
             refresh_token="standalone_refresh",

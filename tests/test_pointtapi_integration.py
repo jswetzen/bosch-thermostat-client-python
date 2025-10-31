@@ -231,7 +231,7 @@ async def test_pointtapi_gateway_initialization():
     gateway = GatewayClass(
         session=mock_session,
         session_type="HTTP",
-        host="101638933",
+        host="123456789",  # Example device_id
         access_key=None,
         access_token="mock_access_token",
         refresh_token=None,
@@ -263,7 +263,7 @@ async def test_pointtapi_circuit_discovery():
     gateway = GatewayClass(
         session=mock_session,
         session_type="HTTP",
-        host="101638933",
+        host="123456789",  # Example device_id
         access_key=None,
         access_token="mock_access_token",
         refresh_token=None,
@@ -305,7 +305,7 @@ async def test_pointtapi_only_valid_endpoints():
     gateway = GatewayClass(
         session=mock_session,
         session_type="HTTP",
-        host="101638933",
+        host="123456789",  # Example device_id
         access_key=None,
         access_token="mock_access_token",
         refresh_token=None,
@@ -363,7 +363,7 @@ async def test_pointtapi_circuit_reads_values():
     gateway = GatewayClass(
         session=mock_session,
         session_type="HTTP",
-        host="101638933",
+        host="123456789",  # Example device_id
         access_key=None,
         access_token="mock_access_token",
         refresh_token=None,
@@ -414,7 +414,7 @@ async def test_pointtapi_bulk_endpoint_optimization():
     gateway = GatewayClass(
         session=mock_session,
         session_type="HTTP",
-        host="101638933",
+        host="123456789",  # Example device_id
         access_key=None,
         access_token="mock_access_token",
         refresh_token=None,

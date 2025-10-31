@@ -14,7 +14,7 @@ from bosch_thermostat_client.gateway import gateway_chooser
 logging.basicConfig(level=logging.DEBUG, format='%(name)s - %(levelname)s - %(message)s')
 
 async def main():
-    DEVICE_ID = "101638933"
+    DEVICE_ID = "YOUR_DEVICE_ID"  # Replace with your actual device ID
     TOKEN_FILE = "tokens.json"
 
     print("=" * 70)

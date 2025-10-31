@@ -11,7 +11,7 @@ All required changes have been implemented and tested. PoinTT API is now ready f
 **Before:**
 ```python
 PoinTTAPIGateway(
-    device_id="101638933",
+    device_id="YOUR_DEVICE_ID",
     access_token="token",
     session=session,
     token_file="tokens.json"
@@ -23,7 +23,7 @@ PoinTTAPIGateway(
 PoinTTAPIGateway(
     session=aiohttp_session,      # HA's async_get_clientsession()
     session_type="HTTP",           # Protocol constant
-    host="101638933",              # Device ID (HA calls it host)
+    host="YOUR_DEVICE_ID",              # Device ID (HA calls it host)
     access_key=None,               # OAuth doesn't use this
     access_token="token",          # OAuth token from entry.data
     refresh_token="refresh",       # OAuth refresh token from entry.data
@@ -332,7 +332,7 @@ await gateway.initialize()  # May refresh token internally
 gateway = PoinTTAPIGateway(
     session=aiohttp_session,
     session_type="HTTP",
-    host="101638933",
+    host="YOUR_DEVICE_ID",
     access_key=None,
     access_token=initial_token,
     refresh_token=initial_refresh,
@@ -347,7 +347,7 @@ gateway = PoinTTAPIGateway(
 gateway = PoinTTAPIGateway(
     session=aiohttp_session,
     session_type="HTTP",
-    host="101638933",
+    host="YOUR_DEVICE_ID",
     access_key=None,
     access_token=entry.data["access_token"],
     refresh_token=entry.data["refresh_token"],

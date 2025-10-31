@@ -199,7 +199,7 @@ from bosch_pointt_api import BoschPointtAPI
 api = BoschPointtAPI(token_file="tokens.pkl")
 api.load_tokens()
 
-devices = ["101638933", "101638934"]
+devices = ["YOUR_DEVICE_ID", "101638934"]
 
 for device_id in devices:
     print(f"Querying device {device_id}:")
@@ -272,7 +272,7 @@ Tokens are stored in pickle files (default: `tokens.pkl`). The file contains:
 
 ### Device IDs
 
-Device IDs can be found through the Bosch app or by querying the gateway list endpoint. Common format is numeric (e.g., `101638933`).
+Device IDs can be found through the Bosch app or by querying the gateway list endpoint. Common format is numeric (e.g., `YOUR_DEVICE_ID`).
 
 ## Error Handling
 

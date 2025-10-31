@@ -27,7 +27,7 @@ async def main():
     """Main test function."""
 
     # Configuration - update these values
-    DEVICE_ID = "101638933"  # Your device ID
+    DEVICE_ID = "YOUR_DEVICE_ID"  # Replace with your actual device ID
     TOKEN_FILE = "tokens.json"  # Path to your token file
 
     print("=== PoinTT API Integration Test ===\n")

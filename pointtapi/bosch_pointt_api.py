@@ -404,9 +404,9 @@ def main():
 Examples:
   %(prog)s auth                                    # Start OAuth flow
   %(prog)s refresh                                 # Refresh access token
-  %(prog)s query standard --device 101638933      # Get standard functions
-  %(prog)s query temp --device 101638933          # Get temperature setpoint
-  %(prog)s set-temp 22.5 --device 101638933       # Set temperature to 22.5°C
+  %(prog)s query standard --device YOUR_DEVICE_ID      # Get standard functions
+  %(prog)s query temp --device YOUR_DEVICE_ID          # Get temperature setpoint
+  %(prog)s set-temp 22.5 --device YOUR_DEVICE_ID       # Set temperature to 22.5°C
         """,
     )
 

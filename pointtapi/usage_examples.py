@@ -15,7 +15,7 @@ def example_full_oauth_flow():
     print("=== OAuth Authentication Flow ===")
 
     # Initialize the API client
-    api = BoschPointtAPI(token_file="my_tokens.pkl", device_id="101638933")
+    api = BoschPointtAPI(token_file="my_tokens.pkl", device_id="YOUR_DEVICE_ID")
 
     # Step 1: Generate OAuth URL
     auth_url = api.build_auth_url()
@@ -42,7 +42,7 @@ def example_load_and_refresh_tokens():
     """
     print("\n=== Token Management ===")
 
-    api = BoschPointtAPI(token_file="my_tokens.pkl", device_id="101638933")
+    api = BoschPointtAPI(token_file="my_tokens.pkl", device_id="YOUR_DEVICE_ID")
 
     # Load existing tokens
     if api.load_tokens():
@@ -67,7 +67,7 @@ def example_api_queries():
     """
     print("\n=== API Queries ===")
 
-    api = BoschPointtAPI(token_file="my_tokens.pkl", device_id="101638933")
+    api = BoschPointtAPI(token_file="my_tokens.pkl", device_id="YOUR_DEVICE_ID")
     api.load_tokens()
 
     # Get standard functions (most commonly used)
@@ -101,7 +101,7 @@ def example_set_temperature():
     """
     print("\n=== Setting Temperature ===")
 
-    api = BoschPointtAPI(token_file="my_tokens.pkl", device_id="101638933")
+    api = BoschPointtAPI(token_file="my_tokens.pkl", device_id="YOUR_DEVICE_ID")
     api.load_tokens()
 
     # Set temperature to 22.5°C
@@ -121,7 +121,7 @@ def example_custom_api_request():
     """
     print("\n=== Custom API Request ===")
 
-    api = BoschPointtAPI(token_file="my_tokens.pkl", device_id="101638933")
+    api = BoschPointtAPI(token_file="my_tokens.pkl", device_id="YOUR_DEVICE_ID")
     api.load_tokens()
 
     # Make a custom GET request
@@ -151,7 +151,7 @@ def example_multiple_devices():
     api = BoschPointtAPI(token_file="my_tokens.pkl")
     api.load_tokens()
 
-    devices = ["101638933", "101638934", "101638935"]  # Example device IDs
+    devices = ["YOUR_DEVICE_ID", "101638934", "101638935"]  # Example device IDs
 
     for device_id in devices:
         print(f"\nQuerying device {device_id}...")
@@ -170,7 +170,7 @@ def example_error_handling():
     """
     print("\n=== Error Handling ===")
 
-    api = BoschPointtAPI(token_file="my_tokens.pkl", device_id="101638933")
+    api = BoschPointtAPI(token_file="my_tokens.pkl", device_id="YOUR_DEVICE_ID")
 
     try:
         # Try to load tokens

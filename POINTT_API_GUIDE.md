@@ -7,7 +7,7 @@ This guide explains how to use the PoinTT API integration for controlling IVT/Bo
 ### 1. Prerequisites
 
 You need:
-- Your device ID (e.g., "101638933")
+- Your device ID (e.g., "YOUR_DEVICE_ID")
 - OAuth access token and refresh token
 
 ### 2. Token Setup
@@ -134,7 +134,7 @@ After the first refresh, your `tokens.json` will be automatically updated with:
   "refresh_token": "refresh_token",
   "expires_at": "2025-10-29T15:30:00.123456",
   "saved_at": "2025-10-29T14:30:00.123456",
-  "device_id": "101638933"
+  "device_id": "YOUR_DEVICE_ID"
 }
 ```
 

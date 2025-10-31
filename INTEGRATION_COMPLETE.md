@@ -28,7 +28,7 @@ The implementation stores `expires_at` in tokens.json and checks it before each 
   "refresh_token": "...",
   "expires_at": "2025-10-29T15:30:00.123456",
   "saved_at": "2025-10-29T14:30:00.123456",
-  "device_id": "101638933"
+  "device_id": "YOUR_DEVICE_ID"
 }
 ```
 
@@ -59,7 +59,7 @@ Expected output:
 1. Loading tokens from tokens.json...
    ✓ Access token loaded
 
-2. Initializing PoinTT API gateway for device 101638933...
+2. Initializing PoinTT API gateway for device YOUR_DEVICE_ID...
    ✓ Gateway initialized
    - Device type: POINTTAPI
    - Bus type: POINTTAPI
@@ -119,7 +119,7 @@ from bosch_thermostat_client.gateway import gateway_chooser
 async def test():
     async with aiohttp.ClientSession() as session:
         GatewayClass = gateway_chooser(POINTTAPI)
-        gateway = GatewayClass('101638933', 'dummy', session, 'tokens.json')
+        gateway = GatewayClass('YOUR_DEVICE_ID', 'dummy', session, 'tokens.json')
         await gateway.initialize()
         circuits = await gateway.initialize_circuits(AC)
         await circuits[0].update()

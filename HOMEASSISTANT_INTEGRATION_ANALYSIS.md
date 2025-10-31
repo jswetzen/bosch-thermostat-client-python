@@ -207,7 +207,7 @@ token = gateway.access_token  # Gets initial token
 gateway = PoinTTAPIGateway(
     session=websession,
     session_type="HTTP",  # ❌ Not accepted
-    host="101638933",
+    host="YOUR_DEVICE_ID",
     access_key=None,      # ❌ Not accepted
     access_token="token"
 )
@@ -216,7 +216,7 @@ gateway = PoinTTAPIGateway(
 **Current Constructor Expects:**
 ```python
 gateway = PoinTTAPIGateway(
-    device_id="101638933",  # ❌ Different parameter name
+    device_id="YOUR_DEVICE_ID",  # ❌ Different parameter name
     access_token="token",
     session=websession,
     token_file="tokens.json"  # ❌ HA won't pass this
@@ -421,7 +421,7 @@ async def check_firmware_validity(self):
        gateway = PoinTTAPIGateway(
            session=session,
            session_type="HTTP",
-           host="101638933",
+           host="YOUR_DEVICE_ID",
            access_key=None,
            access_token="token",
            refresh_token="refresh"
@@ -464,7 +464,7 @@ async def check_firmware_validity(self):
        gateway = PoinTTAPIGateway(
            session=new_session,
            session_type="HTTP",
-           host="101638933",
+           host="YOUR_DEVICE_ID",
            access_key=None,
            access_token=config_entry['access_token'],
            refresh_token=config_entry['refresh_token']
