@@ -38,23 +38,25 @@ class PoinTTAPIGateway(BaseGateway):
     def __init__(
         self,
         session,
-        session_type,
-        host,
-        access_key,
-        access_token,
+        session_type=None,
+        host=None,
+        access_key=None,
+        access_token=None,
         refresh_token=None,
         token_file=None,
+        **kwargs
     ):
         """PoinTT API Gateway constructor
 
         Args:
             session: aiohttp session for HTTP requests (required for PoinTT)
-            session_type (str): Protocol type (accepted for compatibility, ignored - always HTTP)
+            session_type (str, optional): Protocol type (accepted for compatibility, ignored - always HTTP)
             host (str): Device ID for the PoinTT API
-            access_key: Not used for OAuth (accepted for compatibility with HA)
+            access_key (optional): Not used for OAuth (accepted for compatibility with HA)
             access_token (str): OAuth access token
             refresh_token (str, optional): OAuth refresh token for token renewal
             token_file (str, optional): Path to token storage file (for standalone use, not HA)
+            **kwargs: Additional arguments for compatibility
         """
         self._device_id = host  # For PoinTT API, host is the device ID
         self._access_token = access_token
