@@ -16,6 +16,7 @@ from bosch_thermostat_client.const import (
     TYPE,
     ID,
     REFERENCES,
+    UUID,
 )
 from bosch_thermostat_client.const.ivt import SYSTEM_INFO
 from bosch_thermostat_client.const.pointtapi import CIRCUIT_TYPES, CIRCUIT_TYPES as POINTTAPI_CIRCUIT_TYPES
@@ -257,3 +258,30 @@ class PoinTTAPIGateway(BaseGateway):
             bool: Always True for PoinTT API
         """
         return True
+
+    async def check_connection(self):
+        """Check connection and return UUID.
+
+        For PoinTT API, the device_id is the unique identifier.
+        The API doesn't expose a separate /gateway/uuid endpoint.
+
+        Returns:
+            str: Device ID (which serves as the UUID)
+        """
+        try:
+            # Initialize if needed (validates credentials, loads database)
+            if not self._initialized:
+                await self.initialize()
+
+            # For PoinTT API, device_id IS the UUID
+            # Store it in expected location for HA component
+            if UUID not in self._data[GATEWAY]:
+                self._data[GATEWAY][UUID] = self._device_id
+
+            _LOGGER.debug("PoinTT API connection validated, UUID: %s", self.uuid)
+
+        except Exception as err:
+            _LOGGER.error("Failed to check_connection: %s", err)
+            raise
+
+        return self.uuid
