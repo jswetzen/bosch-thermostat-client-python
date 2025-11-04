@@ -14,9 +14,7 @@
                 "heat",
                 "cool",
                 "fanOnly"
-            ],
-            "state_class": "measurement",
-            "device_class": "mode"
+            ]
         },
         "acControl": {
             "id": "/airConditioning/acControl",
@@ -28,9 +26,7 @@
             "allowedValues": [
                 "on",
                 "off"
-            ],
-            "state_class": "measurement",
-            "device_class": "switch"
+            ]
         },
         "fanSpeed": {
             "id": "/airConditioning/fanSpeed",
@@ -45,9 +41,7 @@
                 "low",
                 "mid",
                 "high"
-            ],
-            "state_class": "measurement",
-            "device_class": "fan"
+            ]
         },
         "airFlowHorizontal": {
             "id": "/airConditioning/airFlowHorizontal",
@@ -61,9 +55,7 @@
                 "left",
                 "right",
                 "swing"
-            ],
-            "state_class": "measurement",
-            "device_class": "airflow"
+            ]
         },
         "airFlowVertical": {
             "id": "/airConditioning/airFlowVertical",
@@ -80,9 +72,7 @@
                 "angle4",
                 "angle5",
                 "swing"
-            ],
-            "state_class": "measurement",
-            "device_class": "airflow"
+            ]
         },
         "temperatureSetpoint": {
             "id": "/airConditioning/temperatureSetpoint",
@@ -124,14 +114,13 @@
                 "topRight",
                 "topCenter",
                 "topLeft"
-            ],
-            "state_class": "measurement",
-            "device_class": "airflow"
+            ]
         }
     },
     "sensors": {
         "operationMode": {
             "id": "/airConditioning/operationMode",
+            "name": "Operation Mode",
             "bosch_type": "stringValue",
             "type": "regular",
             "writeable": 1,
@@ -141,12 +130,11 @@
                 "heat",
                 "cool",
                 "fanOnly"
-            ],
-            "state_class": "measurement",
-            "device_class": "mode"
+            ]
         },
         "acControl": {
             "id": "/airConditioning/acControl",
+            "name": "AC Control",
             "bosch_type": "stringValue",
             "type": "binary",
             "writeable": 1,
@@ -154,12 +142,11 @@
             "allowedValues": [
                 "on",
                 "off"
-            ],
-            "state_class": "measurement",
-            "device_class": "switch"
+            ]
         },
         "fanSpeed": {
             "id": "/airConditioning/fanSpeed",
+            "name": "Fan Speed",
             "bosch_type": "stringValue",
             "type": "regular",
             "writeable": 1,
@@ -170,12 +157,11 @@
                 "low",
                 "mid",
                 "high"
-            ],
-            "state_class": "measurement",
-            "device_class": "fan"
+            ]
         },
         "airFlowHorizontal": {
             "id": "/airConditioning/airFlowHorizontal",
+            "name": "Air Flow Horizontal",
             "bosch_type": "stringValue",
             "type": "select",
             "writeable": 1,
@@ -185,12 +171,11 @@
                 "left",
                 "right",
                 "swing"
-            ],
-            "state_class": "measurement",
-            "device_class": "airflow"
+            ]
         },
         "airFlowVertical": {
             "id": "/airConditioning/airFlowVertical",
+            "name": "Air Flow Vertical",
             "bosch_type": "stringValue",
             "type": "select",
             "writeable": 1,
@@ -203,12 +188,11 @@
                 "angle4",
                 "angle5",
                 "swing"
-            ],
-            "state_class": "measurement",
-            "device_class": "airflow"
+            ]
         },
         "temperatureSetpoint": {
             "id": "/airConditioning/temperatureSetpoint",
+            "name": "Temperature Setpoint",
             "bosch_type": "floatValue",
             "type": "number",
             "writeable": 1,
@@ -221,7 +205,7 @@
         },
         "roomTemperature": {
             "id": "/airConditioning/roomTemperature",
-            "name": "Room temperature",
+            "name": "Room Temperature",
             "state_class": "measurement",
             "device_class": "temperature",
             "bosch_type": "floatValue",
@@ -230,6 +214,7 @@
         },
         "quickAirFlows": {
             "id": "/airConditioning/quickAirFlows",
+            "name": "Quick Air Flows",
             "bosch_type": "stringValue",
             "type": "select",
             "writeable": 1,
@@ -241,9 +226,7 @@
                 "topRight",
                 "topCenter",
                 "topLeft"
-            ],
-            "state_class": "measurement",
-            "device_class": "airflow"
+            ]
         }
     },
     "acCircuits": {
