@@ -87,19 +87,6 @@
             "state_class": "measurement",
             "device_class": "temperature"
         },
-        "roomTemperature": {
-            "id": "/airConditioning/roomTemperature",
-            "name": "Room Temperature",
-            "writeable": 1,
-            "recordable": 0,
-            "state_class": "measurement",
-            "device_class": "temperature",
-            "bosch_type": "floatValue",
-            "type": "number",
-            "unitOfMeasure": "C",
-            "minValue": 16.0,
-            "maxValue": 30.0
-        },
         "quickAirFlows": {
             "id": "/airConditioning/quickAirFlows",
             "name": "Quick Air Flows",
@@ -206,10 +193,12 @@
         "roomTemperature": {
             "id": "/airConditioning/roomTemperature",
             "name": "Room Temperature",
-            "state_class": "measurement",
-            "device_class": "temperature",
             "bosch_type": "floatValue",
             "type": "regular",
+            "writeable": 0,
+            "recordable": 0,
+            "state_class": "measurement",
+            "device_class": "temperature",
             "unitOfMeasure": "C"
         },
         "quickAirFlows": {
