@@ -247,6 +247,70 @@ class PoinTTAPIGateway(BaseGateway):
             return self._connector._token_expires_at.isoformat()
         return None
 
+    def get_token_info(self):
+        """Get all token information for HA to store/compare.
+
+        Returns:
+            dict: Dictionary with token information:
+                - access_token: Current OAuth access token
+                - refresh_token: Current OAuth refresh token
+                - token_expires_at: ISO string of expiration time
+                - device_id: Device ID (for validation)
+
+        Example for HA:
+            # Get current tokens
+            token_info = gateway.get_token_info()
+
+            # Compare with stored tokens
+            if token_info != entry.data.get('token_info'):
+                # Update config entry
+                hass.config_entries.async_update_entry(
+                    entry,
+                    data={**entry.data, **token_info}
+                )
+        """
+        return {
+            'access_token': self.access_token,
+            'refresh_token': self.refresh_token,
+            'token_expires_at': self.token_expires_at,
+            'device_id': self._device_id,
+        }
+
+    def tokens_changed(self, stored_access_token, stored_refresh_token=None):
+        """Check if tokens have changed since last storage.
+
+        Useful for HA to determine if config entry needs updating.
+
+        Args:
+            stored_access_token: The access token stored in HA config entry
+            stored_refresh_token: The refresh token stored in HA config entry (optional)
+
+        Returns:
+            bool: True if tokens have changed, False otherwise
+
+        Example for HA:
+            # In thermostat_refresh or after any gateway operation
+            if gateway.tokens_changed(
+                entry.data['access_token'],
+                entry.data.get('refresh_token')
+            ):
+                _LOGGER.info("OAuth tokens refreshed, updating config entry")
+                hass.config_entries.async_update_entry(
+                    entry,
+                    data={
+                        **entry.data,
+                        'access_token': gateway.access_token,
+                        'refresh_token': gateway.refresh_token,
+                        'token_expires_at': gateway.token_expires_at,
+                    }
+                )
+        """
+        if self.access_token != stored_access_token:
+            return True
+        if stored_refresh_token and self.refresh_token != stored_refresh_token:
+            return True
+        return False
+
     async def check_firmware_validity(self):
         """Check firmware validity.
 
