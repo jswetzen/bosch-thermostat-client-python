@@ -215,16 +215,61 @@ async def test_all_entities():
         for entity in readonly_entities:
             print(f"  • {entity['id']}: {entity['current_value']} {entity['unit']}")
 
+        # Check if AC is currently on - if so, turn it off for testing
+        print_header("Step 6: Preparing for Tests (Turn Off AC)")
+
+        ac_control_entity = next((e for e in writable_entities if 'acControl' in e['id']), None)
+        original_ac_state = None
+
+        if ac_control_entity:
+            original_ac_state = ac_control_entity['current_value']
+            print(f"Current AC state: {original_ac_state}")
+
+            if original_ac_state == 'on':
+                print_info("Turning AC off to allow testing all controls...")
+                try:
+                    await gateway._connector.put(ac_control_entity['id'], 'off')
+                    await asyncio.sleep(3)  # Wait for AC to turn off
+
+                    # Verify it turned off
+                    result = await gateway._connector.get(ac_control_entity['id'])
+                    if result.get('value') == 'off':
+                        print_success("AC turned off successfully")
+                    else:
+                        print_warning(f"AC state: {result.get('value')} (may still be shutting down)")
+                        await asyncio.sleep(3)  # Wait a bit more
+                except Exception as e:
+                    print_error(f"Failed to turn off AC: {e}")
+                    print_warning("Proceeding with tests anyway (some may fail)")
+            else:
+                print_success("AC is already off, good for testing")
+
         # Test writing to all writable entities
-        print_header("Step 6: Testing Write Operations")
+        print_header("Step 7: Testing Write Operations")
 
         test_results = []
 
         for entity in writable_entities:
+            # Skip acControl since we're using it to control test environment
+            if 'acControl' in entity['id']:
+                print_info(f"\nSkipping: {entity['name']}")
+                print_info("  (Used for test setup, will be restored at end)")
+                continue
             entity_id = entity['id']
             entity_name = entity_id.split('/')[-1]
             current_value = entity['current_value']
             entity_type = entity['type']
+
+            # Special case: quickAirFlows with empty value cannot be tested (can't restore)
+            if entity_name == 'quickAirFlows' and current_value == '':
+                print(f"\n{Colors.BOLD}Skipping: {entity_name}{Colors.ENDC}")
+                print_info("  Empty value is a read-only state, cannot be restored after test")
+                test_results.append({
+                    'entity': entity_name,
+                    'status': 'skipped',
+                    'reason': 'Empty value cannot be restored'
+                })
+                continue
 
             print(f"\n{Colors.BOLD}Testing: {entity_name}{Colors.ENDC}")
             print(f"  ID: {entity_id}")
@@ -309,17 +354,21 @@ async def test_all_entities():
                     })
 
                 # Restore original value
-                print_info(f"  Restoring original value: {current_value}")
-                await gateway._connector.put(entity_id, current_value)
-                await asyncio.sleep(1)
-
-                # Verify restore
-                result = await gateway._connector.get(entity_id)
-                restored_value = result.get('value')
-                if restored_value == current_value:
-                    print_success(f"  Restored: {restored_value} ✓")
+                # Special case: quickAirFlows with empty string cannot be restored (read-only state)
+                if entity_name == 'quickAirFlows' and current_value == '':
+                    print_info(f"  Skipping restore (empty string is read-only state, cannot be set)")
                 else:
-                    print_warning(f"  Restore mismatch: expected {current_value}, got {restored_value}")
+                    print_info(f"  Restoring original value: {current_value}")
+                    await gateway._connector.put(entity_id, current_value)
+                    await asyncio.sleep(1)
+
+                    # Verify restore
+                    result = await gateway._connector.get(entity_id)
+                    restored_value = result.get('value')
+                    if restored_value == current_value:
+                        print_success(f"  Restored: {restored_value} ✓")
+                    else:
+                        print_warning(f"  Restore mismatch: expected {current_value}, got {restored_value}")
 
             except Exception as e:
                 print_error(f"  Write failed: {e}")
@@ -329,8 +378,25 @@ async def test_all_entities():
                     'error': str(e)
                 })
 
+        # Restore AC to original state
+        print_header("Step 8: Restoring AC to Original State")
+
+        if original_ac_state and ac_control_entity:
+            print(f"Restoring AC to: {original_ac_state}")
+            try:
+                await gateway._connector.put(ac_control_entity['id'], original_ac_state)
+                await asyncio.sleep(2)
+
+                result = await gateway._connector.get(ac_control_entity['id'])
+                if result.get('value') == original_ac_state:
+                    print_success(f"AC restored to '{original_ac_state}' successfully")
+                else:
+                    print_warning(f"AC state: {result.get('value')}")
+            except Exception as e:
+                print_error(f"Failed to restore AC state: {e}")
+
         # Final report
-        print_header("Step 7: Test Results Summary")
+        print_header("Step 9: Test Results Summary")
 
         success_count = sum(1 for r in test_results if r['status'] == 'success')
         failed_count = sum(1 for r in test_results if r['status'] == 'failed')
@@ -364,7 +430,7 @@ async def test_all_entities():
                 print(f"{Colors.OKCYAN}○{Colors.ENDC} {entity}: {result.get('reason', 'Skipped')}")
 
         # Check for token refresh
-        print_header("Step 8: Token Refresh Check")
+        print_header("Step 10: Token Refresh Check")
         if gateway.tokens_changed(access_token, refresh_token):
             print_success("Tokens were refreshed during test")
             print_info(f"  New access_token: {gateway.access_token[:20]}...")
