@@ -15,7 +15,8 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from bosch_thermostat_client.gateway.pointtapi import PointTApiGateway
+from bosch_thermostat_client.const import POINTTAPI, AC
+from bosch_thermostat_client.gateway import gateway_chooser
 
 # Terminal colors
 class Colors:
@@ -341,23 +342,36 @@ async def main():
     async with aiohttp.ClientSession() as session:
         # Initialize gateway
         print_info("\nInitializing PoinTT API gateway...")
-        gateway = PointTApiGateway(
-            session=session,
-            device_id=DEVICE_ID,
-            access_token=access_token,
-            refresh_token=refresh_token,
-        )
-
         try:
+            GatewayClass = gateway_chooser(POINTTAPI)
+            gateway = GatewayClass(
+                session=session,
+                session_type="HTTP",
+                host=DEVICE_ID,
+                access_key=None,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                token_file=TOKENS_FILE
+            )
+
             await gateway.initialize()
             print_success("✓ Gateway initialized")
             print_info(f"  Device type: {gateway.device_type}")
+            print_info(f"  Bus type: {gateway.bus_type}")
             print_info(f"  UUID: {gateway.uuid}")
 
             # Initialize AC circuits
             print_info("\nInitializing AC circuits...")
-            circuits = list(gateway.initialize_circuits())
+            await gateway.initialize_circuits(AC)
+            circuits = gateway.ac_circuits
+
+            if not circuits:
+                print_error("No AC circuits found")
+                return
+
             print_success(f"✓ Found {len(circuits)} AC circuit(s)")
+            for circuit in circuits:
+                print_info(f"  Circuit ID: {circuit.attr_id}")
 
             # Start interactive loop
             input("\nPress Enter to start interactive testing...")
