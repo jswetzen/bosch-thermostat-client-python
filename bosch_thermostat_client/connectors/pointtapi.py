@@ -57,17 +57,44 @@ class BulkEndpoint:
                 await self._request()
                 self._requested_uris.clear()
             self._requested_uris.add(uri)
-            return self._data.get(uri)
+            result = self._data.get(uri)
+            if result is None:
+                _LOGGER.warning(
+                    "URI %s is in bulk endpoint but not in response data. "
+                    "Available URIs: %s",
+                    uri,
+                    list(self._data.keys())
+                )
+            return result
         else:
             return {}
 
     async def _request(self):
         # Get fresh headers on each request to handle token refresh
         headers = self._headers_callback()
-        async with self._websession.get(self._endpoint, headers=headers) as response:
-            data = await response.json()
-        for uri_data in data.get("references", []):
-            self._data[uri_data["id"]] = uri_data
+        try:
+            async with self._websession.get(self._endpoint, headers=headers) as response:
+                if response.status != 200:
+                    _LOGGER.error(
+                        "Bulk endpoint %s returned status %s",
+                        self._endpoint,
+                        response.status
+                    )
+                    return
+                data = await response.json()
+            for uri_data in data.get("references", []):
+                self._data[uri_data["id"]] = uri_data
+            _LOGGER.debug(
+                "Bulk endpoint %s fetched %d URIs",
+                self._endpoint,
+                len(self._data)
+            )
+        except Exception as e:
+            _LOGGER.error(
+                "Error fetching bulk endpoint %s: %s",
+                self._endpoint,
+                e
+            )
 
 
 class PoinTTAPIConnector:
