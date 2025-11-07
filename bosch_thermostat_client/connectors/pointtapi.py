@@ -123,13 +123,14 @@ class PoinTTAPIConnector:
         "bacon",
     ]
 
-    def __init__(self, host, access_token, refresh_token=None, device_type=POINTTAPI, token_file=None, **kwargs):
+    def __init__(self, host, access_token, refresh_token=None, token_expires_at=None, device_type=POINTTAPI, token_file=None, **kwargs):
         """Init PoinTT API connector.
 
         Args:
             host: Device ID for the PoinTT API (not a hostname)
             access_token: OAuth access token
             refresh_token: OAuth refresh token (optional, for token renewal)
+            token_expires_at: Token expiration timestamp (ISO string or datetime, optional)
             device_type: Device type constant
             token_file: Path to token storage file (optional, for standalone use)
             **kwargs: Additional arguments including 'loop' for websession
@@ -145,7 +146,15 @@ class PoinTTAPIConnector:
         # OAuth token management
         self._access_token = access_token
         self._refresh_token = refresh_token
-        self._token_expires_at = None
+
+        # Parse token_expires_at if provided
+        if token_expires_at:
+            if isinstance(token_expires_at, str):
+                self._token_expires_at = datetime.fromisoformat(token_expires_at)
+            else:
+                self._token_expires_at = token_expires_at
+        else:
+            self._token_expires_at = None
 
         # Bulk request management
         self._bulk_endpoints = {}
@@ -454,7 +463,7 @@ class PoinTTAPIConnector:
                         self._refresh_token = response_json.get("refresh_token")
 
                         expires_in = response_json.get("expires_in", 3600)
-                        self._token_expires_at = datetime.now() + timedelta(seconds=expires_in)
+                        self._token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
                         self._save_tokens()
 

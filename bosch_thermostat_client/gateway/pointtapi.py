@@ -44,6 +44,7 @@ class PoinTTAPIGateway(BaseGateway):
         access_key=None,
         access_token=None,
         refresh_token=None,
+        token_expires_at=None,
         token_file=None,
         **kwargs
     ):
@@ -56,6 +57,7 @@ class PoinTTAPIGateway(BaseGateway):
             access_key (optional): Not used for OAuth (accepted for compatibility with HA)
             access_token (str): OAuth access token
             refresh_token (str, optional): OAuth refresh token for token renewal
+            token_expires_at (str, optional): ISO format timestamp when token expires
             token_file (str, optional): Path to token storage file (for standalone use, not HA)
             **kwargs: Additional arguments for compatibility
         """
@@ -69,6 +71,7 @@ class PoinTTAPIGateway(BaseGateway):
             host=host,  # Device ID
             access_token=access_token,
             refresh_token=refresh_token,
+            token_expires_at=token_expires_at,
             loop=session,
             token_file=token_file,
         )
