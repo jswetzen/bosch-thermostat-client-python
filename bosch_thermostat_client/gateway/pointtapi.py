@@ -183,7 +183,7 @@ class PoinTTAPIGateway(BaseGateway):
                 _LOGGER.debug(f"Created AC circuit object: {circuit_object}")
             except Exception as e:
                 _LOGGER.error(f"Failed to create AC circuit object: {e}", exc_info=True)
-                return
+                return []
 
             if circuit_object:
                 try:
@@ -191,7 +191,7 @@ class PoinTTAPIGateway(BaseGateway):
                     _LOGGER.debug(f"AC circuit initialized, state={circuit_object.state}")
                 except Exception as e:
                     _LOGGER.error(f"Failed to initialize AC circuit: {e}", exc_info=True)
-                    return
+                    return []
 
                 if circuit_object.state:
                     self._data[circ_type]._items.append(circuit_object)
@@ -201,9 +201,12 @@ class PoinTTAPIGateway(BaseGateway):
             else:
                 _LOGGER.warning("Failed to create AC circuit object")
 
+            # Return the list of circuits for get_capabilities() to detect
+            return self.get_circuits(circ_type)
+
         else:
             # For other circuit types (HC, DHW, etc.), use standard discovery
-            await super().initialize_circuits(circ_type)
+            return await super().initialize_circuits(circ_type)
 
     @property
     def ac_circuits(self):
