@@ -178,6 +178,121 @@ class ACCircuit(BasicCircuit):
                     return HVAC_FAN
         return HVAC_OFF
 
+    # ========================================================================
+    # Home Assistant Compatibility Properties
+    # ========================================================================
+
+    @property
+    def temp_units(self):
+        """Return temperature units (always Celsius for PoinTT API)."""
+        return "C"
+
+    @property
+    def support_presets(self):
+        """Return whether presets are supported (not for AC)."""
+        return False
+
+    @property
+    def min_temp(self):
+        """Return minimum temperature for AC (16.0°C for PoinTT API)."""
+        return 16.0
+
+    @property
+    def max_temp(self):
+        """Return maximum temperature for AC (30.0°C for PoinTT API)."""
+        return 30.0
+
+    @property
+    def ha_modes(self):
+        """Return list of available HVAC modes for Home Assistant.
+
+        Maps AC operation modes to HA climate HVAC modes:
+        - auto -> auto
+        - heat -> heat
+        - cool -> cool
+        - fanOnly -> fan_only
+        - off (via status) -> off
+        """
+        modes = ["off"]  # Always support turning off
+
+        # Add modes based on available AC operation modes
+        # For now, assume all modes are available since PoinTT API doesn't
+        # expose capability discovery for operation modes
+        modes.extend(["auto", "heat", "cool", "fan_only"])
+
+        return modes
+
+    @property
+    def ha_mode(self):
+        """Return current HVAC mode in Home Assistant terminology.
+
+        Maps Bosch AC operation modes to HA HVAC modes:
+        - "auto" -> "auto"
+        - "heat" -> "heat"
+        - "cool" -> "cool"
+        - "fanOnly" -> "fan_only"
+        - status=="off" -> "off"
+        """
+        if not self.is_on:
+            return "off"
+
+        mode = self.operation_mode
+        if mode == self.AC_MODE_AUTO:
+            return "auto"
+        elif mode == self.AC_MODE_HEAT:
+            return "heat"
+        elif mode == self.AC_MODE_COOL:
+            return "cool"
+        elif mode == self.AC_MODE_FAN:
+            return "fan_only"
+
+        # Default to off if mode is unknown
+        return "off"
+
+    async def set_ha_mode(self, hvac_mode):
+        """Set HVAC mode using Home Assistant terminology.
+
+        Args:
+            hvac_mode: HA HVAC mode ("auto", "heat", "cool", "fan_only", "off")
+
+        Returns:
+            int: 1 if mode changed, 0 if no change, -1 if error
+        """
+        _LOGGER.debug(f"Setting HA mode to {hvac_mode}")
+
+        # Handle off mode - turn off the AC
+        if hvac_mode == "off":
+            result = await self.turn_off()
+            return 1 if result else -1
+
+        # Map HA mode to AC operation mode
+        mode_map = {
+            "auto": self.AC_MODE_AUTO,
+            "heat": self.AC_MODE_HEAT,
+            "cool": self.AC_MODE_COOL,
+            "fan_only": self.AC_MODE_FAN,
+        }
+
+        ac_mode = mode_map.get(hvac_mode)
+        if not ac_mode:
+            _LOGGER.error(f"Invalid HA HVAC mode: {hvac_mode}")
+            return -1
+
+        # Check if mode is changing
+        current_mode = self.operation_mode
+        if current_mode == ac_mode and self.is_on:
+            _LOGGER.debug("Mode unchanged")
+            return 0
+
+        # Turn on if needed (set_operation_mode requires AC to be on)
+        if not self.is_on:
+            await self.turn_on()
+
+        # Set the operation mode
+        result = await self.set_operation_mode(ac_mode)
+
+        return 1 if result else -1
+
     @property
     def available_operation_modes(self):
         """Get available operation modes."""
