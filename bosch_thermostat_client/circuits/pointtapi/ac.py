@@ -203,6 +203,32 @@ class ACCircuit(BasicCircuit):
         return 30.0
 
     @property
+    def setpoint(self):
+        """Return current temperature setpoint.
+
+        For AC, this is the same as target_temperature.
+        Required by HA's BoschThermostat for state_attributes.
+        """
+        return self.target_temperature
+
+    @property
+    def schedule(self):
+        """Return schedule object (not supported for AC).
+
+        AC units via PoinTT API don't support schedules.
+        Required by HA's BoschThermostat for state_attributes.
+        """
+        return None
+
+    @property
+    def extra_state_attributes(self):
+        """Return extra state attributes for HA.
+
+        Optional property for additional state information.
+        """
+        return {}
+
+    @property
     def ha_modes(self):
         """Return list of available HVAC modes for Home Assistant.
 

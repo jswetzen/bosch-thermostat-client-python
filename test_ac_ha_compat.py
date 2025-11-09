@@ -97,6 +97,9 @@ async def test_ha_compatibility():
                 'hvac_action',
                 'support_presets',
                 'state',
+                'setpoint',
+                'schedule',
+                'extra_state_attributes',
             ]
 
             print("\n✓ Checking required HA properties:")
