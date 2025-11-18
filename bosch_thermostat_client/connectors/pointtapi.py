@@ -107,6 +107,9 @@ class PoinTTAPIConnector:
     # OAuth constants
     CLIENT_ID = "762162C0-FA2D-4540-AE66-6489F189FADC"
     REDIRECT_URI = "com.bosch.tt.dashtt.pointt://app/login"
+    # Note: CODE_VERIFIER is static (not randomized per flow)
+    # This matches the official Bosch mobile app implementation.
+    # The Bosch PoinTT API appears to expect this specific verifier value.
     CODE_VERIFIER = "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklm"
 
     SCOPES = [
@@ -282,9 +285,6 @@ class PoinTTAPIConnector:
 
     def _make_url(self, uri):
         """Make full URL from URI."""
-        if uri.startswith('/resource/'):
-            # Remove /resource/ prefix as it's part of the base URL structure
-            uri = uri[10:]
         return urljoin(self._base_url + "resource/", uri.lstrip("/"))
 
     def add_bulk_endpoint(self, endpoint, uris):
@@ -296,7 +296,18 @@ class PoinTTAPIConnector:
         self._uri_bulk_endpoints.update({uri: bulk_endpoint for uri in uris})
 
     async def _request(self, method, uri, **kwargs):
-        """Make authenticated request to PoinTT API."""
+        """Make authenticated request to PoinTT API with exponential backoff retry.
+
+        Retries on:
+        - HTTP 429 (Too Many Requests)
+        - HTTP 503 (Service Unavailable)
+
+        Retry configuration:
+        - Initial backoff: 1 second
+        - Max backoff: 60 seconds
+        - Max retries: 5 attempts
+        - Backoff multiplier: 2x
+        """
         await self._ensure_valid_token()
 
         url = self._make_url(uri)
@@ -305,29 +316,76 @@ class PoinTTAPIConnector:
         kwargs['headers'] = headers
         kwargs.setdefault('timeout', self._request_timeout)
 
-        _LOGGER.debug("Sending %s request to %s", method.__name__.upper(), url)
+        # Retry configuration
+        max_retries = 5
+        initial_backoff = 1.0  # seconds
+        max_backoff = 60.0  # seconds
+        backoff_multiplier = 2.0
 
-        try:
-            method_func = getattr(self._websession, method.__name__)
-            async with method_func(url, **kwargs) as response:
-                if response.status == 200:
-                    if response.content_type == APP_JSON:
-                        return await response.json()
+        last_exception = None
+        backoff = initial_backoff
+
+        for attempt in range(max_retries):
+            try:
+                _LOGGER.debug("Sending %s request to %s (attempt %d/%d)",
+                             method.__name__.upper(), url, attempt + 1, max_retries)
+
+                method_func = getattr(self._websession, method.__name__)
+                async with method_func(url, **kwargs) as response:
+                    # Check for rate limiting or service unavailable
+                    if response.status in (429, 503):
+                        if attempt < max_retries - 1:
+                            # Calculate backoff with exponential increase
+                            wait_time = min(backoff, max_backoff)
+                            _LOGGER.warning(
+                                "Received HTTP %d for %s, retrying in %.1f seconds (attempt %d/%d)",
+                                response.status, uri, wait_time, attempt + 1, max_retries
+                            )
+                            await asyncio.sleep(wait_time)
+                            backoff *= backoff_multiplier
+                            continue
+                        else:
+                            # Last attempt failed
+                            raise DeviceException(
+                                f"Max retries exceeded for {uri}: HTTP {response.status}"
+                            )
+
+                    if response.status == 200:
+                        if response.content_type == APP_JSON:
+                            return await response.json()
+                        else:
+                            return await response.text()
+                    elif method.__name__ == 'put' and response.status == 204:
+                        return True
                     else:
-                        return await response.text()
-                elif method.__name__ == 'put' and response.status == 204:
-                    return True
-                else:
-                    raise ResponseException(response)
+                        raise ResponseException(response)
 
-        except ClientResponseError as err:
-            raise DeviceException(f"URI {uri} does not exist: {err}")
-        except ClientConnectorError as err:
-            raise DeviceException(f"Connection error: {err}")
-        except ClientError as err:
-            raise DeviceException(f"Client error for {uri}: {err}")
-        except Exception as err:
-            raise DeviceException(f"Unexpected error for {uri}: {err}")
+            except ClientResponseError as err:
+                raise DeviceException(f"URI {uri} does not exist: {err}")
+            except ClientConnectorError as err:
+                raise DeviceException(f"Connection error: {err}")
+            except ClientError as err:
+                raise DeviceException(f"Client error for {uri}: {err}")
+            except DeviceException:
+                # Re-raise DeviceException (including rate limit errors)
+                raise
+            except Exception as err:
+                last_exception = err
+                if attempt < max_retries - 1:
+                    wait_time = min(backoff, max_backoff)
+                    _LOGGER.warning(
+                        "Request failed with %s, retrying in %.1f seconds (attempt %d/%d)",
+                        type(err).__name__, wait_time, attempt + 1, max_retries
+                    )
+                    await asyncio.sleep(wait_time)
+                    backoff *= backoff_multiplier
+                    continue
+                else:
+                    raise DeviceException(f"Unexpected error for {uri}: {err}")
+
+        # Should not reach here, but just in case
+        if last_exception:
+            raise DeviceException(f"Max retries exceeded for {uri}: {last_exception}")
 
     async def get(self, uri):
         """Get data from API endpoint."""

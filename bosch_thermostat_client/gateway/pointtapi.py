@@ -75,7 +75,7 @@ class PoinTTAPIGateway(BaseGateway):
             loop=session,
             token_file=token_file,
         )
-        self._data = {GATEWAY: {}, AC: None, SENSORS: None}
+        self._data = {GATEWAY: {}}
         super().__init__(host)
 
     async def _update_info(self, initial_db):

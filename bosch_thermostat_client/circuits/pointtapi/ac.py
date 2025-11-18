@@ -387,8 +387,7 @@ class ACCircuit(BasicCircuit):
             return False
 
         try:
-            # Fan speed would need to be added to refs, using direct URI for now
-            uri = "/airConditioning/fanSpeed"
+            uri = self._data["fan_speed"][URI]
             result = await self._connector.put(uri, speed)
             if result:
                 _LOGGER.debug("Set fan speed to %s", speed)
@@ -405,8 +404,7 @@ class ACCircuit(BasicCircuit):
             return False
 
         try:
-            # Airflow would need to be added to refs, using direct URI for now
-            uri = "/airConditioning/airFlowHorizontal"
+            uri = self._data["air_flow_horizontal"][URI]
             result = await self._connector.put(uri, direction)
             if result:
                 _LOGGER.debug("Set horizontal air flow to %s", direction)
@@ -423,8 +421,7 @@ class ACCircuit(BasicCircuit):
             return False
 
         try:
-            # Airflow would need to be added to refs, using direct URI for now
-            uri = "/airConditioning/airFlowVertical"
+            uri = self._data["air_flow_vertical"][URI]
             result = await self._connector.put(uri, direction)
             if result:
                 _LOGGER.debug("Set vertical air flow to %s", direction)

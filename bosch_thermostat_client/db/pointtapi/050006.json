@@ -239,6 +239,21 @@
                 "id": "/airConditioning/acControl",
                 "name": "AC control status",
                 "type": "regular"
+            },
+            "fan_speed": {
+                "id": "/airConditioning/fanSpeed",
+                "name": "Fan speed",
+                "type": "regular"
+            },
+            "air_flow_horizontal": {
+                "id": "/airConditioning/airFlowHorizontal",
+                "name": "Air flow horizontal",
+                "type": "regular"
+            },
+            "air_flow_vertical": {
+                "id": "/airConditioning/airFlowVertical",
+                "name": "Air flow vertical",
+                "type": "regular"
             }
         }
     },
